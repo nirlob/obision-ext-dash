@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run compile-schemas && npm run pack",
     "compile-schemas": "glib-compile-schemas schemas/",
-    "pack": "gnome-extensions pack --force --extra-source=schemas/ --extra-source=src/",
+    "pack": "gnome-extensions pack --force --extra-source=schemas/",
     "install": "gnome-extensions install --force obision-extension-dash@obision.com.shell-extension.zip",
     "enable": "gnome-extensions enable obision-extension-dash@obision.com",
     "deploy": "npm run build && npm run install && echo '\n✓ Extension installed! Restart GNOME Shell:' && echo '  X11: Alt+F2 → type r → Enter' && echo '  Wayland: Log out and back in' && echo '\nThen run: npm run enable'",

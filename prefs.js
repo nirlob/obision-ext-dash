@@ -1,5 +1,6 @@
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
+import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
@@ -113,6 +114,265 @@ class PanelSettingsPage extends Adw.PreferencesPage {
         );
         
         behaviorGroup.add(autoHideRow);
+
+        // Background group
+        const backgroundGroup = new Adw.PreferencesGroup({
+            title: 'Background',
+            description: 'Configure panel background',
+        });
+        this.add(backgroundGroup);
+
+        // Transparent background switch
+        const transparentBgRow = new Adw.SwitchRow({
+            title: 'Transparent Background',
+            subtitle: 'Make panel background transparent',
+        });
+        
+        settings.bind(
+            'transparent-background',
+            transparentBgRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        backgroundGroup.add(transparentBgRow);
+
+        // Background color with color button
+        const bgColorRow = new Adw.ActionRow({
+            title: 'Background Color',
+            subtitle: 'Solid background color for the panel',
+        });
+        
+        // Create a button with a colored box
+        const colorButton = new Gtk.Button({
+            valign: Gtk.Align.CENTER,
+            has_frame: true,
+            width_request: 40,
+            height_request: 40,
+        });
+        
+        // Create a box to show the current color
+        const colorBox = new Gtk.Box({
+            width_request: 32,
+            height_request: 32,
+            css_classes: ['color-preview'],
+        });
+        colorButton.set_child(colorBox);
+        
+        // Parse initial color from settings
+        const colorString = settings.get_string('background-color');
+        const rgba = new Gdk.RGBA();
+        if (rgba.parse(colorString)) {
+            colorBox.set_css_classes(['color-preview']);
+            const css = `
+                .color-preview {
+                    background-color: ${colorString};
+                    border-radius: 4px;
+                }
+            `;
+            const cssProvider = new Gtk.CssProvider();
+            cssProvider.load_from_data(css, -1);
+            colorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        
+        // Create color chooser dialog
+        const colorChooser = new Gtk.ColorChooserDialog({
+            title: 'Choose Background Color',
+            modal: true,
+            use_alpha: true,
+        });
+        
+        if (rgba.parse(colorString)) {
+            colorChooser.set_rgba(rgba);
+        }
+        
+        // Connect button click to show color chooser
+        colorButton.connect('clicked', () => {
+            colorChooser.set_transient_for(colorButton.get_root());
+            colorChooser.show();
+        });
+        
+        // Connect to color changes in the dialog
+        colorChooser.connect('response', (dialog, response) => {
+            if (response === Gtk.ResponseType.OK) {
+                const newColor = colorChooser.get_rgba();
+                const colorStr = newColor.to_string();
+                settings.set_string('background-color', colorStr);
+                
+                // Update the color box
+                const css = `
+                    .color-preview {
+                        background-color: ${colorStr};
+                        border-radius: 4px;
+                    }
+                `;
+                const cssProvider = new Gtk.CssProvider();
+                cssProvider.load_from_data(css, -1);
+                colorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            }
+            dialog.hide();
+        });
+        
+        bgColorRow.add_suffix(colorButton);
+        bgColorRow.activatable_widget = colorButton;
+        backgroundGroup.add(bgColorRow);
+
+        // Bind sensitivity: disable color picker when transparent is active
+        transparentBgRow.connect('notify::active', () => {
+            bgColorRow.sensitive = !transparentBgRow.active;
+        });
+        
+        // Set initial sensitivity
+        bgColorRow.sensitive = !settings.get_boolean('transparent-background');
+    }
+});
+
+// System Panel Settings Page
+const SystemPanelSettingsPage = GObject.registerClass(
+class SystemPanelSettingsPage extends Adw.PreferencesPage {
+    constructor(settings) {
+        super({
+            title: 'System panel',
+            icon_name: 'preferences-system-symbolic',
+        });
+
+        // Date group
+        const dateGroup = new Adw.PreferencesGroup({
+            title: 'Date Display',
+            description: 'Configure date position in top bar',
+        });
+        this.add(dateGroup);
+
+        // Date position
+        const datePositionRow = new Adw.ComboRow({
+            title: 'Date Position',
+            subtitle: 'Where to display the date in the top bar',
+        });
+        
+        const positionModel = new Gtk.StringList();
+        positionModel.append('Left');
+        positionModel.append('Down');
+        datePositionRow.model = positionModel;
+        
+        const positions = ['left', 'down'];
+        const currentDatePosition = settings.get_string('date-position');
+        const selectedIndex = positions.indexOf(currentDatePosition);
+        datePositionRow.selected = selectedIndex >= 0 ? selectedIndex : 0;
+        
+        datePositionRow.connect('notify::selected', (widget) => {
+            settings.set_string('date-position', positions[widget.selected]);
+        });
+        
+        dateGroup.add(datePositionRow);
+
+        // Date spacing
+        const dateSpacingRow = new Adw.SpinRow({
+            title: 'Separation pixels',
+            subtitle: 'Space between icons and date in pixels',
+            adjustment: new Gtk.Adjustment({
+                lower: 0,
+                upper: 50,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'date-spacing',
+            dateSpacingRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        dateGroup.add(dateSpacingRow);
+        
+        // Date font size
+        const dateFontSizeRow = new Adw.SpinRow({
+            title: 'Font size',
+            subtitle: 'Size of date text',
+            adjustment: new Gtk.Adjustment({
+                lower: 8,
+                upper: 30,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'date-font-size',
+            dateFontSizeRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        dateGroup.add(dateFontSizeRow);
+        
+        // Date font bold
+        const dateFontBoldRow = new Adw.ActionRow({
+            title: 'Bold text',
+            subtitle: 'Make date text bold',
+        });
+        
+        const dateFontBoldSwitch = new Gtk.Switch({
+            active: settings.get_boolean('date-font-bold'),
+            valign: Gtk.Align.CENTER,
+        });
+        
+        settings.bind(
+            'date-font-bold',
+            dateFontBoldSwitch,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        dateFontBoldRow.add_suffix(dateFontBoldSwitch);
+        dateFontBoldRow.set_activatable_widget(dateFontBoldSwitch);
+        dateGroup.add(dateFontBoldRow);
+
+        // Icons group
+        const iconsGroup = new Adw.PreferencesGroup({
+            title: 'Icons',
+            description: 'Configure system panel icons',
+        });
+        this.add(iconsGroup);
+
+        // Icon size
+        const iconSizeRow = new Adw.SpinRow({
+            title: 'Icon Size',
+            subtitle: 'Size of system panel icons in pixels',
+            adjustment: new Gtk.Adjustment({
+                lower: 12,
+                upper: 32,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'system-icon-size',
+            iconSizeRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        iconsGroup.add(iconSizeRow);
+
+        // Icon margins
+        const iconMarginsRow = new Adw.SpinRow({
+            title: 'Margins',
+            subtitle: 'Applied to left and right of each icon',
+            adjustment: new Gtk.Adjustment({
+                lower: 0,
+                upper: 20,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'system-icon-margins',
+            iconMarginsRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        iconsGroup.add(iconMarginsRow);
     }
 });
 
@@ -167,5 +427,8 @@ export default class ObisionExtensionDashPreferences extends ExtensionPreference
 
         const iconsPage = new IconsSettingsPage(settings);
         window.add(iconsPage);
+
+        const systemPanelPage = new SystemPanelSettingsPage(settings);
+        window.add(systemPanelPage);
     }
 }

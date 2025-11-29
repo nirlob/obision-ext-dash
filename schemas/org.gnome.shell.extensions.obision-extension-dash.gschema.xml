@@ -41,5 +41,57 @@
       <description>Keyboard shortcut to toggle dash visibility</description>
     </key>
     
+    <key name="transparent-background" type="b">
+      <default>false</default>
+      <summary>Transparent background</summary>
+      <description>Make panel background transparent</description>
+    </key>
+    
+    <key name="background-color" type="s">
+      <default>"rgba(0,0,0,0.8)"</default>
+      <summary>Background color</summary>
+      <description>Solid background color for the panel</description>
+    </key>
+    
+    <key name="date-position" type="s">
+      <default>"left"</default>
+      <summary>Date position</summary>
+      <description>Position of the date in top bar (left, down)</description>
+    </key>
+    
+    <key name="date-spacing" type="i">
+      <default>5</default>
+      <range min="0" max="50"/>
+      <summary>Date spacing</summary>
+      <description>Vertical space between icons and date in pixels</description>
+    </key>
+    
+    <key name="date-font-size" type="i">
+      <default>15</default>
+      <range min="8" max="30"/>
+      <summary>Date font size</summary>
+      <description>Font size for date text in pixels</description>
+    </key>
+    
+    <key name="date-font-bold" type="b">
+      <default>false</default>
+      <summary>Date font bold</summary>
+      <description>Make date text bold</description>
+    </key>
+    
+    <key name="system-icon-size" type="i">
+      <default>20</default>
+      <range min="12" max="32"/>
+      <summary>System icon size</summary>
+      <description>Size of system panel icons in pixels</description>
+    </key>
+    
+    <key name="system-icon-margins" type="i">
+      <default>5</default>
+      <range min="0" max="20"/>
+      <summary>System icon margins</summary>
+      <description>Margin applied to left and right of each system icon in pixels</description>
+    </key>
+    
   </schema>
 </schemalist>

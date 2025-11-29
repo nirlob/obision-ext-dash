@@ -5,6 +5,7 @@ import St from 'gi://St';
 import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
+import Gdk from 'gi://Gdk';
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 
@@ -23,12 +24,24 @@ export default class ObisionExtensionDash extends Extension {
         this._menu = null;
         this._panelButtonPressId = null;
         this._stageButtonPressId = null;
+        this._dateMenu = null;
+        this._originalDateMenuParent = null;
+        this._originalDateMenuIndex = null;
+        this._originalDateMenuStyle = null;
+        this._dateVerticalContainer = null;
+        this._iconsHorizontalBox = null;
+        this._originalRightBoxChildren = null;
+        this._originalLeftBoxWidth = null;
+        this._originalCenterBoxParent = null;
+        this._originalRightBoxParent = null;
+        this._originalRightBoxStyle = null;
     }
 
     enable() {
         log('Obision Extension Dash enabling');
         
         this._settings = this.getSettings();
+        this._enableTimestamp = Date.now();
         
         // Get the native dash from overview
         this._dash = Main.overview.dash;
@@ -46,13 +59,17 @@ export default class ObisionExtensionDash extends Extension {
             reactive: true,
             track_hover: true,
             clip_to_allocation: true,
+            style: 'spacing: 0px;',
         });
+        
+        // Apply initial background style
+        this._updatePanelBackground();
         
         // Create dash container (will hold the dash icons)
         this._dashContainer = new St.BoxLayout({
             name: 'obision-dash-container',
             style_class: 'obision-dash-container',
-            x_expand: false,
+            x_expand: true,
             y_expand: false,
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.START,
@@ -63,7 +80,7 @@ export default class ObisionExtensionDash extends Extension {
         this._topBarContainer = new St.BoxLayout({
             name: 'obision-topbar-container',
             style_class: 'obision-topbar-container',
-            x_expand: true,
+            x_expand: false,
             y_expand: false,
             x_align: Clutter.ActorAlign.END,
         });
@@ -86,11 +103,37 @@ export default class ObisionExtensionDash extends Extension {
             this._topPanel.statusArea.activities.container.hide();
         }
         
-        // Configure top panel to not expand
-        this._topPanel.x_expand = false;
+        // Make left box invisible and take no space
+        if (this._topPanel._leftBox) {
+            this._originalLeftBoxWidth = this._topPanel._leftBox.width;
+            this._topPanel._leftBox.set_width(0);
+            this._topPanel._leftBox.hide();
+        }
         
-        // Add top panel to our container
-        this._topBarContainer.add_child(this._topPanel);
+        // Configure top panel to use natural width (content size)
+        this._topPanel.x_expand = false;
+        this._topPanel.natural_width_set = false;
+        
+        // Remove spacing between panel components
+        this._topPanel.set_style('spacing: 0px;');
+        
+        // Extract centerBox and rightBox from the panel
+        if (this._topPanel._centerBox) {
+            this._originalCenterBoxParent = this._topPanel._centerBox.get_parent();
+            if (this._originalCenterBoxParent) {
+                this._originalCenterBoxParent.remove_child(this._topPanel._centerBox);
+            }
+            this._topBarContainer.add_child(this._topPanel._centerBox);
+        }
+        
+        if (this._topPanel._rightBox) {
+            this._originalRightBoxParent = this._topPanel._rightBox.get_parent();
+            this._originalRightBoxStyle = this._topPanel._rightBox.get_style();
+            if (this._originalRightBoxParent) {
+                this._originalRightBoxParent.remove_child(this._topPanel._rightBox);
+            }
+            this._topBarContainer.add_child(this._topPanel._rightBox);
+        }
         
         // Remove dash from overview
         if (this._originalDashParent) {
@@ -107,6 +150,9 @@ export default class ObisionExtensionDash extends Extension {
         // Add containers to main panel
         this._panel.add_child(this._dashContainer);
         this._panel.add_child(this._topBarContainer);
+        
+        // Apply system icon styling immediately before panel is shown
+        this._updateSystemIconStyling();
         
         // Create context menu
         this._createContextMenu();
@@ -174,13 +220,37 @@ export default class ObisionExtensionDash extends Extension {
             this._updatePanelPosition();
         });
         
+        // Apply initial date position
+        this._updateDatePosition();
+        
         // Connect to settings changes
         this._settingsChangedIds = [
             this._settings.connect('changed::dash-position', () => this._updatePanelPosition()),
             this._settings.connect('changed::dash-size', () => this._updatePanelPosition()),
             this._settings.connect('changed::icon-spacing', () => this._updateIconSpacing()),
             this._settings.connect('changed::panel-padding', () => this._updatePanelPadding()),
+            this._settings.connect('changed::transparent-background', () => this._updatePanelBackground()),
+            this._settings.connect('changed::background-color', () => this._updatePanelBackground()),
+            this._settings.connect('changed::date-position', () => this._updateDatePosition()),
+            this._settings.connect('changed::date-spacing', () => this._updateDateSpacing()),
+            this._settings.connect('changed::date-font-size', () => this._updateDateFontSize()),
+            this._settings.connect('changed::date-font-bold', () => this._updateDateFontSize()),
+            this._settings.connect('changed::system-icon-size', () => this._updateSystemIconStyling()),
+            this._settings.connect('changed::system-icon-margins', () => this._updateSystemIconStyling()),
         ];
+        
+        // Apply again with a small delay to catch any late-loading indicators
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+            this._updateSystemIconStyling();
+            return GLib.SOURCE_REMOVE;
+        });
+        
+        // Apply one more time with longer delay to ensure all indicators are loaded
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+            this._updateSystemIconStyling();
+            this._updateDateFontSize();
+            return GLib.SOURCE_REMOVE;
+        });
         
         // Add keybinding to toggle
         Main.wm.addKeybinding(
@@ -263,6 +333,32 @@ export default class ObisionExtensionDash extends Extension {
         if (this._topPanel && this._topPanel.statusArea.activities) {
             this._topPanel.statusArea.activities.container.show();
         }
+        
+        // Restore the left box
+        if (this._topPanel && this._topPanel._leftBox) {
+            if (this._originalLeftBoxWidth !== null) {
+                this._topPanel._leftBox.set_width(this._originalLeftBoxWidth);
+            }
+            this._topPanel._leftBox.show();
+        }
+        
+        // Restore centerBox and rightBox to the panel
+        if (this._topPanel && this._topPanel._centerBox && this._originalCenterBoxParent) {
+            this._topBarContainer.remove_child(this._topPanel._centerBox);
+            this._originalCenterBoxParent.add_child(this._topPanel._centerBox);
+        }
+        
+        if (this._topPanel && this._topPanel._rightBox && this._originalRightBoxParent) {
+            this._topBarContainer.remove_child(this._topPanel._rightBox);
+            // Restore original style
+            if (this._originalRightBoxStyle !== null) {
+                this._topPanel._rightBox.set_style(this._originalRightBoxStyle);
+            }
+            this._originalRightBoxParent.add_child(this._topPanel._rightBox);
+        }
+        
+        // Restore date menu to original position
+        this._restoreDateMenu();
         
         if (this._topPanel && this._originalTopPanelParent) {
             this._originalTopPanelParent.add_child(this._topPanel);
@@ -448,6 +544,58 @@ export default class ObisionExtensionDash extends Extension {
         }
     }
 
+    _updatePanelBackground() {
+        if (!this._panel) return;
+        
+        const isTransparent = this._settings.get_boolean('transparent-background');
+        
+        if (isTransparent) {
+            // Set transparent background
+            this._panel.set_style('background-color: transparent;');
+        } else {
+            // Parse and apply solid color
+            const colorString = this._settings.get_string('background-color');
+            log(`Applying background color: ${colorString}`);
+            
+            // The color string is already in CSS format (e.g., "rgba(0,0,0,0.8)")
+            this._panel.set_style(`background-color: ${colorString};`);
+        }
+    }
+
+    _updateSystemIconStyling() {
+        if (!this._topPanel || !this._topPanel._rightBox) {
+            log('_updateSystemIconStyling: topPanel or rightBox not available');
+            return;
+        }
+        
+        const iconSize = this._settings.get_int('system-icon-size');
+        const iconMargins = this._settings.get_int('system-icon-margins');
+        const fontSize = Math.max(11, iconSize - 5); // Font size relative to icon size
+        
+        log(`_updateSystemIconStyling: iconSize=${iconSize}, iconMargins=${iconMargins}, fontSize=${fontSize}`);
+        
+        const applyIconSize = (actor) => {
+            const constructorName = actor.constructor ? actor.constructor.name : '';
+            
+            if (constructorName === 'St_Icon') {
+                // Apply icon size and margins to left and right
+                actor.set_style(`icon-size: ${iconSize}px; width: ${iconSize}px; height: ${iconSize}px; min-width: ${iconSize}px; min-height: ${iconSize}px; margin-left: ${iconMargins}px; margin-right: ${iconMargins}px;`);
+            } else if (constructorName === 'St_Label') {
+                actor.set_style(`font-size: ${fontSize}px;`);
+            }
+            
+            // Recursively apply to all children
+            if (actor.get_children) {
+                actor.get_children().forEach(child => applyIconSize(child));
+            }
+        };
+        
+        applyIconSize(this._topPanel._rightBox);
+        
+        // Force a relayout
+        this._topPanel._rightBox.queue_relayout();
+    }
+
     _createContextMenu() {
         // Create popup menu with no source actor
         this._menu = new PopupMenu.PopupMenu(null, 0.0, St.Side.TOP);
@@ -464,9 +612,17 @@ export default class ObisionExtensionDash extends Extension {
         // Add separator
         this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         
-        // Add example options
-        const option1 = new PopupMenu.PopupMenuItem('Option 1');
-        this._menu.addMenuItem(option1);
+        // Add enable timestamp
+        const enableDate = new Date(this._enableTimestamp);
+        const enableString = enableDate.toLocaleString('es-ES', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            day: '2-digit',
+            month: '2-digit'
+        });
+        const timestampItem = new PopupMenu.PopupMenuItem(`Habilitado: ${enableString}`);
+        this._menu.addMenuItem(timestampItem);
         
         const option2 = new PopupMenu.PopupMenuItem('Option 2');
         this._menu.addMenuItem(option2);
@@ -519,5 +675,184 @@ export default class ObisionExtensionDash extends Extension {
             }
             return Clutter.EVENT_PROPAGATE;
         });
+    }
+
+    _updateDatePosition() {
+        if (!this._topPanel) return;
+        
+        const datePosition = this._settings.get_string('date-position');
+        
+        // Get the date menu from the center box
+        if (!this._dateMenu) {
+            this._dateMenu = this._topPanel.statusArea.dateMenu;
+            if (!this._dateMenu) {
+                log('Date menu not found');
+                return;
+            }
+            
+            // Save original parent and index
+            this._originalDateMenuParent = this._dateMenu.container.get_parent();
+            if (this._originalDateMenuParent) {
+                this._originalDateMenuIndex = this._originalDateMenuParent.get_children().indexOf(this._dateMenu.container);
+            }
+            
+            // Save original style
+            this._originalDateMenuStyle = this._dateMenu.container.get_style();
+        }
+        
+        if (datePosition === 'down') {
+            // Create a vertical container if it doesn't exist
+            if (!this._dateVerticalContainer) {
+                this._dateVerticalContainer = new St.BoxLayout({
+                    vertical: true,
+                    x_align: Clutter.ActorAlign.END,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: 'background-color: transparent;',
+                });
+                
+                // Save the original right box children
+                this._originalRightBoxChildren = [];
+                const rightBoxChildren = this._topPanel._rightBox.get_children();
+                for (let child of rightBoxChildren) {
+                    this._originalRightBoxChildren.push(child);
+                }
+                
+                // Remove all children from right box
+                rightBoxChildren.forEach(child => {
+                    this._topPanel._rightBox.remove_child(child);
+                });
+                
+                // Create a horizontal box for the icons
+                this._iconsHorizontalBox = new St.BoxLayout({
+                    vertical: false,
+                    x_align: Clutter.ActorAlign.END,
+                    style: 'background-color: transparent;',
+                });
+                
+                // Add original children to the horizontal box
+                this._originalRightBoxChildren.forEach(child => {
+                    this._iconsHorizontalBox.add_child(child);
+                });
+                
+                // Add horizontal box to vertical container
+                this._dateVerticalContainer.add_child(this._iconsHorizontalBox);
+                
+                // Add vertical container to right box
+                this._topPanel._rightBox.add_child(this._dateVerticalContainer);
+            }
+            
+            // Move date to vertical container (below icons)
+            const currentParent = this._dateMenu.container.get_parent();
+            if (currentParent) {
+                currentParent.remove_child(this._dateMenu.container);
+            }
+            
+            // Add date below the icons box
+            this._dateVerticalContainer.add_child(this._dateMenu.container);
+            
+            // Apply spacing
+            this._updateDateSpacing();
+            
+            log('Date moved down below icons');
+        } else {
+            // Restore to left position (in center box, aligned right)
+            this._restoreDateMenu();
+            
+            // Apply horizontal spacing
+            this._updateDateSpacing();
+            
+            log('Date moved to left position (in center box)');
+        }
+        
+        // Apply font size
+        this._updateDateFontSize();
+    }
+
+    _updateDateSpacing() {
+        const spacing = this._settings.get_int('date-spacing');
+        
+        if (this._dateVerticalContainer && this._iconsHorizontalBox) {
+            // Vertical spacing when in down position
+            this._dateVerticalContainer.set_style(`spacing: ${spacing}px; background-color: transparent;`);
+            log(`Date vertical spacing updated to ${spacing}px`);
+        } else if (this._topPanel && this._topPanel._centerBox) {
+            // Horizontal spacing in left position (margin-right on center box)
+            this._topPanel._centerBox.set_style(`margin-right: ${spacing}px;`);
+            log(`Center box margin-right updated to ${spacing}px`);
+        }
+    }
+
+    _updateDateFontSize() {
+        if (!this._dateMenu) return;
+        
+        const fontSize = this._settings.get_int('date-font-size');
+        const fontBold = this._settings.get_boolean('date-font-bold');
+        const fontWeight = fontBold ? 'bold' : 'normal';
+        
+        log(`_updateDateFontSize: ${fontSize}px, bold: ${fontBold}`);
+        
+        // Apply font size and weight to all labels in the date menu
+        const applyFontSize = (actor) => {
+            const constructorName = actor.constructor ? actor.constructor.name : '';
+            
+            if (constructorName === 'St_Label') {
+                actor.set_style(`font-size: ${fontSize}px; font-weight: ${fontWeight};`);
+            }
+            
+            // Recursively apply to all children
+            if (actor.get_children) {
+                actor.get_children().forEach(child => applyFontSize(child));
+            }
+        };
+        
+        applyFontSize(this._dateMenu.container);
+    }
+
+    _restoreDateMenu() {
+        if (!this._dateMenu || !this._originalDateMenuParent) return;
+        
+        // If we created a vertical container, restore the original right box structure
+        if (this._dateVerticalContainer) {
+            // Remove date from vertical container
+            const currentParent = this._dateMenu.container.get_parent();
+            if (currentParent) {
+                currentParent.remove_child(this._dateMenu.container);
+            }
+            
+            // Remove vertical container from right box
+            this._topPanel._rightBox.remove_child(this._dateVerticalContainer);
+            
+            // Restore original children to right box
+            if (this._originalRightBoxChildren) {
+                this._originalRightBoxChildren.forEach(child => {
+                    // Remove from icons box if still there
+                    const parent = child.get_parent();
+                    if (parent) {
+                        parent.remove_child(child);
+                    }
+                    this._topPanel._rightBox.add_child(child);
+                });
+            }
+            
+            // Clean up
+            this._dateVerticalContainer.destroy();
+            this._dateVerticalContainer = null;
+            this._iconsHorizontalBox = null;
+            this._originalRightBoxChildren = null;
+        }
+        
+        // Restore date to original position
+        const currentParent = this._dateMenu.container.get_parent();
+        if (currentParent && currentParent !== this._originalDateMenuParent) {
+            currentParent.remove_child(this._dateMenu.container);
+        }
+        
+        if (this._originalDateMenuIndex >= 0) {
+            this._originalDateMenuParent.insert_child_at_index(this._dateMenu.container, this._originalDateMenuIndex);
+        } else {
+            this._originalDateMenuParent.add_child(this._dateMenu.container);
+        }
+        
+        // Don't restore original style, we'll apply our spacing
     }
 }
