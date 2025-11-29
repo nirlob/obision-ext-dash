@@ -776,97 +776,285 @@ class IconsSettingsPage extends Adw.PreferencesPage {
         
         bordersGroup.add(cornerRadiusRow);
 
-        // Show border switch
-        const showBorderRow = new Adw.SwitchRow({
-            title: 'Show Border',
-            subtitle: 'Display border around icon backgrounds',
+        // Normal show border switch
+        const normalShowBorderRow = new Adw.SwitchRow({
+            title: 'Normal Show Border',
+            subtitle: 'Display border around icon backgrounds in normal state',
         });
         
         settings.bind(
-            'icon-show-border',
-            showBorderRow,
+            'icon-normal-show-border',
+            normalShowBorderRow,
             'active',
             Gio.SettingsBindFlags.DEFAULT
         );
         
-        bordersGroup.add(showBorderRow);
+        bordersGroup.add(normalShowBorderRow);
 
-        // Border color with color button
-        const borderColorRow = new Adw.ActionRow({
-            title: 'Border Color',
-            subtitle: 'Color for icon borders',
+        // Normal border color with color button
+        const normalBorderColorRow = new Adw.ActionRow({
+            title: 'Normal Border Color',
+            subtitle: 'Color for icon borders in normal state',
         });
         
-        const borderColorButton = new Gtk.Button({
+        const normalBorderColorButton = new Gtk.Button({
             valign: Gtk.Align.CENTER,
             has_frame: true,
             width_request: 40,
             height_request: 40,
         });
         
-        const borderColorBox = new Gtk.Box({
+        const normalBorderColorBox = new Gtk.Box({
             width_request: 32,
             height_request: 32,
-            css_classes: ['border-color-preview'],
+            css_classes: ['normal-border-color-preview'],
         });
-        borderColorButton.set_child(borderColorBox);
+        normalBorderColorButton.set_child(normalBorderColorBox);
         
-        const borderColorString = settings.get_string('icon-border-color');
-        const borderRgba = new Gdk.RGBA();
-        if (borderRgba.parse(borderColorString)) {
-            const borderCss = `
-                .border-color-preview {
-                    background-color: ${borderColorString};
+        const normalBorderColorString = settings.get_string('icon-normal-border-color');
+        const normalBorderRgba = new Gdk.RGBA();
+        if (normalBorderRgba.parse(normalBorderColorString)) {
+            const normalBorderCss = `
+                .normal-border-color-preview {
+                    background-color: ${normalBorderColorString};
                     border-radius: 4px;
                 }
             `;
-            const borderCssProvider = new Gtk.CssProvider();
-            borderCssProvider.load_from_data(borderCss, -1);
-            borderColorBox.get_style_context().add_provider(borderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            const normalBorderCssProvider = new Gtk.CssProvider();
+            normalBorderCssProvider.load_from_data(normalBorderCss, -1);
+            normalBorderColorBox.get_style_context().add_provider(normalBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
         
-        const borderColorChooser = new Gtk.ColorChooserDialog({
-            title: 'Choose Border Color',
+        const normalBorderColorChooser = new Gtk.ColorChooserDialog({
+            title: 'Choose Normal Border Color',
             modal: true,
             use_alpha: true,
         });
         
-        if (borderRgba.parse(borderColorString)) {
-            borderColorChooser.set_rgba(borderRgba);
+        if (normalBorderRgba.parse(normalBorderColorString)) {
+            normalBorderColorChooser.set_rgba(normalBorderRgba);
         }
         
-        borderColorButton.connect('clicked', () => {
-            borderColorChooser.set_transient_for(borderColorButton.get_root());
-            borderColorChooser.show();
+        normalBorderColorButton.connect('clicked', () => {
+            normalBorderColorChooser.set_transient_for(normalBorderColorButton.get_root());
+            normalBorderColorChooser.show();
         });
         
-        borderColorChooser.connect('response', (dialog, response) => {
+        normalBorderColorChooser.connect('response', (dialog, response) => {
             if (response === Gtk.ResponseType.OK) {
-                const newColor = borderColorChooser.get_rgba();
+                const newColor = normalBorderColorChooser.get_rgba();
                 const colorStr = newColor.to_string();
-                settings.set_string('icon-border-color', colorStr);
+                settings.set_string('icon-normal-border-color', colorStr);
                 
                 const css = `
-                    .border-color-preview {
+                    .normal-border-color-preview {
                         background-color: ${colorStr};
                         border-radius: 4px;
                     }
                 `;
                 const cssProvider = new Gtk.CssProvider();
                 cssProvider.load_from_data(css, -1);
-                borderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+                normalBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
             }
             dialog.hide();
         });
         
-        borderColorRow.add_suffix(borderColorButton);
-        borderColorRow.activatable_widget = borderColorButton;
-        bordersGroup.add(borderColorRow);
+        normalBorderColorRow.add_suffix(normalBorderColorButton);
+        normalBorderColorRow.activatable_widget = normalBorderColorButton;
+        bordersGroup.add(normalBorderColorRow);
         
-        // Bind border color row sensitivity to show border switch
-        showBorderRow.bind_property(
+        // Bind normal border color row sensitivity to show border switch
+        normalShowBorderRow.bind_property(
             'active',
-            borderColorRow,
+            normalBorderColorRow,
+            'sensitive',
+            GObject.BindingFlags.SYNC_CREATE
+        );
+
+        // Hover show border switch
+        const hoverShowBorderRow = new Adw.SwitchRow({
+            title: 'Hover Show Border',
+            subtitle: 'Display border around icon backgrounds in hover state',
+        });
+        
+        settings.bind(
+            'icon-hover-show-border',
+            hoverShowBorderRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        bordersGroup.add(hoverShowBorderRow);
+
+        // Hover border color
+        const hoverBorderColorRow = new Adw.ActionRow({
+            title: 'Hover Border Color',
+            subtitle: 'Color for icon borders in hover state',
+        });
+        
+        const hoverBorderColorButton = new Gtk.Button({
+            valign: Gtk.Align.CENTER,
+            has_frame: true,
+            width_request: 40,
+            height_request: 40,
+        });
+        
+        const hoverBorderColorBox = new Gtk.Box({
+            width_request: 32,
+            height_request: 32,
+            css_classes: ['hover-border-color-preview'],
+        });
+        hoverBorderColorButton.set_child(hoverBorderColorBox);
+        
+        const hoverBorderColorString = settings.get_string('icon-hover-border-color');
+        const hoverBorderRgba = new Gdk.RGBA();
+        if (hoverBorderRgba.parse(hoverBorderColorString)) {
+            const hoverBorderCss = `
+                .hover-border-color-preview {
+                    background-color: ${hoverBorderColorString};
+                    border-radius: 4px;
+                }
+            `;
+            const hoverBorderCssProvider = new Gtk.CssProvider();
+            hoverBorderCssProvider.load_from_data(hoverBorderCss, -1);
+            hoverBorderColorBox.get_style_context().add_provider(hoverBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        
+        const hoverBorderColorChooser = new Gtk.ColorChooserDialog({
+            title: 'Choose Hover Border Color',
+            modal: true,
+            use_alpha: true,
+        });
+        
+        if (hoverBorderRgba.parse(hoverBorderColorString)) {
+            hoverBorderColorChooser.set_rgba(hoverBorderRgba);
+        }
+        
+        hoverBorderColorButton.connect('clicked', () => {
+            hoverBorderColorChooser.set_transient_for(hoverBorderColorButton.get_root());
+            hoverBorderColorChooser.show();
+        });
+        
+        hoverBorderColorChooser.connect('response', (dialog, response) => {
+            if (response === Gtk.ResponseType.OK) {
+                const newColor = hoverBorderColorChooser.get_rgba();
+                const colorStr = newColor.to_string();
+                settings.set_string('icon-hover-border-color', colorStr);
+                
+                const css = `
+                    .hover-border-color-preview {
+                        background-color: ${colorStr};
+                        border-radius: 4px;
+                    }
+                `;
+                const cssProvider = new Gtk.CssProvider();
+                cssProvider.load_from_data(css, -1);
+                hoverBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            }
+            dialog.hide();
+        });
+        
+        hoverBorderColorRow.add_suffix(hoverBorderColorButton);
+        hoverBorderColorRow.activatable_widget = hoverBorderColorButton;
+        bordersGroup.add(hoverBorderColorRow);
+        
+        hoverShowBorderRow.bind_property(
+            'active',
+            hoverBorderColorRow,
+            'sensitive',
+            GObject.BindingFlags.SYNC_CREATE
+        );
+
+        // Selected show border switch
+        const selectedShowBorderRow = new Adw.SwitchRow({
+            title: 'Selected Show Border',
+            subtitle: 'Display border around icon backgrounds in selected state',
+        });
+        
+        settings.bind(
+            'icon-selected-show-border',
+            selectedShowBorderRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        bordersGroup.add(selectedShowBorderRow);
+
+        // Selected border color
+        const selectedBorderColorRow = new Adw.ActionRow({
+            title: 'Selected Border Color',
+            subtitle: 'Color for icon borders in selected state',
+        });
+        
+        const selectedBorderColorButton = new Gtk.Button({
+            valign: Gtk.Align.CENTER,
+            has_frame: true,
+            width_request: 40,
+            height_request: 40,
+        });
+        
+        const selectedBorderColorBox = new Gtk.Box({
+            width_request: 32,
+            height_request: 32,
+            css_classes: ['selected-border-color-preview'],
+        });
+        selectedBorderColorButton.set_child(selectedBorderColorBox);
+        
+        const selectedBorderColorString = settings.get_string('icon-selected-border-color');
+        const selectedBorderRgba = new Gdk.RGBA();
+        if (selectedBorderRgba.parse(selectedBorderColorString)) {
+            const selectedBorderCss = `
+                .selected-border-color-preview {
+                    background-color: ${selectedBorderColorString};
+                    border-radius: 4px;
+                }
+            `;
+            const selectedBorderCssProvider = new Gtk.CssProvider();
+            selectedBorderCssProvider.load_from_data(selectedBorderCss, -1);
+            selectedBorderColorBox.get_style_context().add_provider(selectedBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        
+        const selectedBorderColorChooser = new Gtk.ColorChooserDialog({
+            title: 'Choose Selected Border Color',
+            modal: true,
+            use_alpha: true,
+        });
+        
+        if (selectedBorderRgba.parse(selectedBorderColorString)) {
+            selectedBorderColorChooser.set_rgba(selectedBorderRgba);
+        }
+        
+        selectedBorderColorButton.connect('clicked', () => {
+            selectedBorderColorChooser.set_transient_for(selectedBorderColorButton.get_root());
+            selectedBorderColorChooser.show();
+        });
+        
+        selectedBorderColorChooser.connect('response', (dialog, response) => {
+            if (response === Gtk.ResponseType.OK) {
+                const newColor = selectedBorderColorChooser.get_rgba();
+                const colorStr = newColor.to_string();
+                settings.set_string('icon-selected-border-color', colorStr);
+                
+                const css = `
+                    .selected-border-color-preview {
+                        background-color: ${colorStr};
+                        border-radius: 4px;
+                    }
+                `;
+                const cssProvider = new Gtk.CssProvider();
+                cssProvider.load_from_data(css, -1);
+                selectedBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            }
+            dialog.hide();
+        });
+        
+        selectedBorderColorRow.add_suffix(selectedBorderColorButton);
+        selectedBorderColorRow.activatable_widget = selectedBorderColorButton;
+        bordersGroup.add(selectedBorderColorRow);
+        
+        selectedShowBorderRow.bind_property(
+            'active',
+            selectedBorderColorRow,
             'sensitive',
             GObject.BindingFlags.SYNC_CREATE
         );

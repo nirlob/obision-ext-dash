@@ -257,8 +257,12 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-use-main-bg-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-background-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-size-multiplier', () => this._updateIconStyling()),
-            this._settings.connect('changed::icon-show-border', () => this._updateIconStyling()),
-            this._settings.connect('changed::icon-border-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-normal-show-border', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-normal-border-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-hover-show-border', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-hover-border-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-selected-show-border', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-selected-border-color', () => this._updateIconStyling()),
         ];
         
         // Monitor window focus changes to update active app indicator
@@ -1299,8 +1303,12 @@ export default class ObisionExtensionDash extends Extension {
         const useMainBgColor = this._settings.get_boolean('icon-use-main-bg-color');
         const iconBgColor = this._settings.get_string('icon-background-color');
         const mainBgColor = this._settings.get_string('background-color');
-        const showBorder = this._settings.get_boolean('icon-show-border');
-        const borderColor = this._settings.get_string('icon-border-color');
+        const normalShowBorder = this._settings.get_boolean('icon-normal-show-border');
+        const normalBorderColor = this._settings.get_string('icon-normal-border-color');
+        const hoverShowBorder = this._settings.get_boolean('icon-hover-show-border');
+        const hoverBorderColor = this._settings.get_string('icon-hover-border-color');
+        const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
+        const selectedBorderColor = this._settings.get_string('icon-selected-border-color');
         
         // Determine which color to use
         const bgColor = useMainBgColor ? mainBgColor : iconBgColor;
@@ -1312,7 +1320,7 @@ export default class ObisionExtensionDash extends Extension {
         // Calculate icon size based on multiplier
         const iconSize = Math.floor(this._dash.iconSize * multiplier);
         
-        log(`_updateIconStyling: cornerRadius=${cornerRadius}, useMainBgColor=${useMainBgColor}, bgColor=${bgColor}, showBorder=${showBorder}, borderColor=${borderColor}, sizeMultiplier=${sizeMultiplier}, multiplier=${multiplier}, iconSize=${iconSize}`);
+        log(`_updateIconStyling: cornerRadius=${cornerRadius}, useMainBgColor=${useMainBgColor}, bgColor=${bgColor}, normalShowBorder=${normalShowBorder}, normalBorderColor=${normalBorderColor}, hoverShowBorder=${hoverShowBorder}, hoverBorderColor=${hoverBorderColor}, selectedShowBorder=${selectedShowBorder}, selectedBorderColor=${selectedBorderColor}, sizeMultiplier=${sizeMultiplier}, multiplier=${multiplier}, iconSize=${iconSize}`);
         
         // Apply styles directly with inline styles (this is the only way to override theme styles)
         const numChildren = this._dash._box.get_n_children();
@@ -1327,8 +1335,10 @@ export default class ObisionExtensionDash extends Extension {
                 }
                 
                 // Apply color, border radius, and border to the container
-                const borderStyle = showBorder ? `border: 2px solid ${borderColor};` : '';
-                const containerStyle = `background-color: ${bgColor}; border-radius: ${cornerRadius}px; padding: 0px; ${borderStyle}`;
+                const normalBorderStyle = normalShowBorder ? `border: 2px solid ${normalBorderColor};` : '';
+                const hoverBorderStyle = hoverShowBorder ? `border: 2px solid ${hoverBorderColor};` : '';
+                const selectedBorderStyle = selectedShowBorder ? `border: 2px solid ${selectedBorderColor};` : '';
+                const containerStyle = `background-color: ${bgColor}; border-radius: ${cornerRadius}px; padding: 0px; ${normalBorderStyle}`;
                 child.set_style(containerStyle);
                 log(`Applied container style to child ${i}`);
                 
@@ -1373,9 +1383,9 @@ export default class ObisionExtensionDash extends Extension {
                 child._hoverBgColor = darkenColor(bgColor, 0.7);
                 child._activeBgColor = lightenColor(bgColor, 1.3);
                 child._cornerRadius = cornerRadius;
-                child._showBorder = showBorder;
-                child._borderColor = borderColor;
-                child._borderStyle = borderStyle;
+                child._normalBorderStyle = normalBorderStyle;
+                child._hoverBorderStyle = hoverBorderStyle;
+                child._selectedBorderStyle = selectedBorderStyle;
                 child._isHovered = false;
                 
                 log(`Original color: ${bgColor}, Hover color: ${child._hoverBgColor}, Active color: ${child._activeBgColor}`);
@@ -1440,7 +1450,7 @@ export default class ObisionExtensionDash extends Extension {
                                 const animate = () => {
                                     if (!parent._isHovered || step >= steps) {
                                         if (parent._isHovered) {
-                                            parent.set_style(`background-color: ${parent._hoverBgColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._borderStyle}`);
+                                            parent.set_style(`background-color: ${parent._hoverBgColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._hoverBorderStyle}`);
                                         }
                                         return GLib.SOURCE_REMOVE;
                                     }
@@ -1448,7 +1458,7 @@ export default class ObisionExtensionDash extends Extension {
                                     step++;
                                     const progress = step / steps;
                                     const currentColor = interpolateColor(parent._originalBgColor, parent._hoverBgColor, progress);
-                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._borderStyle}`);
+                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._hoverBorderStyle}`);
                                     return GLib.SOURCE_CONTINUE;
                                 };
                                 
@@ -1471,6 +1481,7 @@ export default class ObisionExtensionDash extends Extension {
                                 
                                 // Check if app is focused - return to active color instead of original
                                 const targetColor = parent._isFocused ? parent._activeBgColor : parent._originalBgColor;
+                                const targetBorderStyle = parent._isFocused ? parent._selectedBorderStyle : parent._normalBorderStyle;
                                 
                                 let step = 0;
                                 const steps = 10;
@@ -1479,7 +1490,7 @@ export default class ObisionExtensionDash extends Extension {
                                 const animate = () => {
                                     if (parent._isHovered || step >= steps) {
                                         if (!parent._isHovered) {
-                                            parent.set_style(`background-color: ${targetColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._borderStyle}`);
+                                            parent.set_style(`background-color: ${targetColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${targetBorderStyle}`);
                                         }
                                         return GLib.SOURCE_REMOVE;
                                     }
@@ -1487,7 +1498,7 @@ export default class ObisionExtensionDash extends Extension {
                                     step++;
                                     const progress = 1 - (step / steps);
                                     const currentColor = interpolateColor(targetColor, parent._hoverBgColor, progress);
-                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${parent._borderStyle}`);
+                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px; ${targetBorderStyle}`);
                                     return GLib.SOURCE_CONTINUE;
                                 };
                                 
@@ -1565,13 +1576,13 @@ export default class ObisionExtensionDash extends Extension {
             const app = appButton.app;
             
             if (app && focusedApp && app.get_id() === focusedApp.get_id()) {
-                // This is the focused app - apply active color
-                child.set_style(`background-color: ${child._activeBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px; ${child._borderStyle || ''}`);
+                // This is the focused app - apply active color with selected border
+                child.set_style(`background-color: ${child._activeBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px; ${child._selectedBorderStyle || ''}`);
                 child._isFocused = true;
                 log(`Set active style for app: ${app.get_id()}`);
             } else if (child._isFocused && !child._isHovered) {
-                // Was focused, no longer - revert to normal
-                child.set_style(`background-color: ${child._originalBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px; ${child._borderStyle || ''}`);
+                // Was focused, no longer - revert to normal with normal border
+                child.set_style(`background-color: ${child._originalBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px; ${child._normalBorderStyle || ''}`);
                 child._isFocused = false;
             }
         }
