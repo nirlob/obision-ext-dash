@@ -14,8 +14,8 @@
     "noEmit": true
   },
   "include": [
-    "src/js/extension.js",
-    "src/js/prefs.js",
+    "extension.js",
+    "prefs.js",
     "types.d.ts"
   ],
   "exclude": [

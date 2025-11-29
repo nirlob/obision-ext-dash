@@ -86,6 +86,9 @@ export default class ObisionExtensionDash extends Extension {
             this._topPanel.statusArea.activities.container.hide();
         }
         
+        // Configure top panel to not expand
+        this._topPanel.x_expand = false;
+        
         // Add top panel to our container
         this._topBarContainer.add_child(this._topPanel);
         
@@ -249,6 +252,11 @@ export default class ObisionExtensionDash extends Extension {
         // Restore top panel
         if (this._topPanel && this._topBarContainer) {
             this._topBarContainer.remove_child(this._topPanel);
+        }
+        
+        // Restore top panel expansion
+        if (this._topPanel) {
+            this._topPanel.x_expand = true;
         }
         
         // Restore the Activities button
