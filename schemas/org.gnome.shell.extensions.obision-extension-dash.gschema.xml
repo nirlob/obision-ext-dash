@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.obision-extension-dash" path="/org/gnome/shell/extensions/obision-extension-dash/">
+    
+    <key name="dash-position" type="s">
+      <default>"BOTTOM"</default>
+      <summary>Dash position</summary>
+      <description>Position of the dash panel (LEFT, RIGHT, TOP, BOTTOM)</description>
+    </key>
+    
+    <key name="dash-size" type="i">
+      <default>80</default>
+      <range min="40" max="200"/>
+      <summary>Dash size</summary>
+      <description>Width (for left/right) or height (for top/bottom) of the dash in pixels</description>
+    </key>
+    
+    <key name="icon-size" type="i">
+      <default>64</default>
+      <range min="24" max="96"/>
+      <summary>Icon size</summary>
+      <description>Size of application icons in pixels</description>
+    </key>
+    
+    <key name="panel-padding" type="i">
+      <default>8</default>
+      <range min="0" max="32"/>
+      <summary>Panel padding</summary>
+      <description>Padding between panel edge and icons in pixels</description>
+    </key>
+    
+    <key name="auto-hide" type="b">
+      <default>false</default>
+      <summary>Auto-hide dash</summary>
+      <description>Hide dash when not in use</description>
+    </key>
+    
+    <key name="toggle-dash" type="as">
+      <default>["&lt;Super&gt;d"]</default>
+      <summary>Toggle dash visibility</summary>
+      <description>Keyboard shortcut to toggle dash visibility</description>
+    </key>
+    
+  </schema>
+</schemalist>

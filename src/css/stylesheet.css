@@ -1,0 +1,78 @@
+/* Obision Panel */
+.obision-panel {
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 0px;
+}
+
+/* Obision Dash Container */
+.obision-dash-container {
+    background-color: transparent;
+}
+
+/* Obision TopBar Container */
+.obision-topbar-container {
+    background-color: transparent;
+    padding: 4px;
+}
+
+/* Make native dash fit our container */
+#dash {
+    background-color: transparent;
+    padding: 0px;
+    margin: 0px;
+}
+
+#dash .dash-background {
+    background-color: transparent;
+}
+
+#dash .dash-separator {
+    width: 0px;
+    height: 0px;
+}
+
+#dash .dash-item-container {
+    padding: 0px;
+}
+
+#dash .dash-item-container > StWidget {
+    padding: 0px;
+    margin: 0px;
+}
+
+/* App icons */
+#dash .dash-item-container {
+    padding: 4px;
+}
+
+#dash .app-well-app,
+#dash .show-apps {
+    padding: 8px;
+    transition-duration: 200ms;
+}
+
+#dash .app-well-app:hover,
+#dash .show-apps:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+#dash .app-well-app:active,
+#dash .show-apps:active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Running app indicator */
+#dash .app-well-app.running .overview-icon {
+    background-image: none;
+}
+
+#dash .app-well-app.running {
+    background-image: none;
+}
+
+/* Focus indicator */
+#dash .app-well-app.focused {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+}
