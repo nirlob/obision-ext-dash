@@ -42,6 +42,7 @@ export default class ObisionExtensionDash extends Extension {
         this._customTimeLabel = null;
         this._customDateLabel = null;
         this._showAppsSeparator = null;
+        this._iconStyleProvider = null;
     }
 
     enable() {
@@ -245,6 +246,9 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::system-icon-margins', () => this._updateSystemIconStyling()),
             this._settings.connect('changed::show-apps-separator', () => this._updateShowAppsSeparator()),
             this._settings.connect('changed::separator-width', () => this._updateShowAppsSeparator()),
+            this._settings.connect('changed::icon-corner-radius', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-use-main-bg-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-background-color', () => this._updateIconStyling()),
         ];
         
         // Apply all styles with delays to ensure panel is ready
@@ -263,6 +267,13 @@ export default class ObisionExtensionDash extends Extension {
             this._updateDatePosition();
             this._moveShowAppsToStart();
             this._updateShowAppsSeparator();
+            this._updateIconStyling();
+            return GLib.SOURCE_REMOVE;
+        });
+        
+        // Apply icon styling again after a longer delay to ensure it overrides theme
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+            this._updateIconStyling();
             return GLib.SOURCE_REMOVE;
         });
         
@@ -352,6 +363,17 @@ export default class ObisionExtensionDash extends Extension {
         if (this._showAppsSeparator) {
             this._showAppsSeparator.destroy();
             this._showAppsSeparator = null;
+        }
+        
+        // Remove icon style provider
+        if (this._iconStyleProvider) {
+            try {
+                const context = St.ThemeContext.get_for_stage(global.stage);
+                context.get_theme().unload_stylesheet(this._iconStyleProvider);
+            } catch (e) {
+                log(`Error unloading icon style provider: ${e.message}`);
+            }
+            this._iconStyleProvider = null;
         }
         
         // Restore dash to overview
@@ -560,14 +582,31 @@ export default class ObisionExtensionDash extends Extension {
         
         // Reapply system icon styling after dash size changes
         this._updateSystemIconStyling();
+        
+        // Update show apps button height
+        this._updateShowAppsButtonHeight();
+        
+        // Update separator height if it exists
+        this._updateShowAppsSeparator();
     }
 
     _updateIconSpacing() {
         if (!this._dash || !this._dash._box) return;
         
         const iconSpacing = this._settings.get_int('icon-spacing');
-        log(`_updateIconSpacing: ${iconSpacing}px`);
-        this._dash._box.set_style(`spacing: ${iconSpacing}px;`);
+        const padding = this._settings.get_int('panel-padding');
+        const dashSize = this._settings.get_int('dash-size');
+        const containerHeight = dashSize - (padding * 2);
+        
+        log(`_updateIconSpacing: ${iconSpacing}px, containerHeight: ${containerHeight}px`);
+        
+        // Set the layout's spacing property directly
+        if (this._dash._box.layout_manager) {
+            this._dash._box.layout_manager.spacing = iconSpacing;
+        }
+        
+        // Also set via style for compatibility
+        this._dash._box.set_style(`spacing: ${iconSpacing}px; height: ${containerHeight}px;`);
         this._dash.queue_relayout();
     }
 
@@ -1100,12 +1139,69 @@ export default class ObisionExtensionDash extends Extension {
         
         // Add at the beginning (index 0)
         dashBox.insert_child_at_index(showAppsIcon, 0);
+        
+        // Remove any margin from the dash box itself to eliminate left spacing
+        if (this._dash._box) {
+            // The spacing property of BoxLayout creates gaps between children
+            // Set margin-left to negative to compensate for the spacing on first element
+            const iconSpacing = this._settings.get_int('icon-spacing');
+            this._dash._box.set_style(`spacing: ${iconSpacing}px; margin-left: 0px;`);
+        }
+        
+        // Also remove padding from dashContainer
+        if (this._dashContainer) {
+            const padding = this._settings.get_int('panel-padding');
+            this._dashContainer.set_style(`padding: 0px ${padding}px ${padding}px 0px;`);
+        }
+        
+        // Force 100% height on show apps button and its internal elements
+        this._updateShowAppsButtonHeight();
+        
         log('Show Applications button moved to start');
         
         // Force a redisplay to update the layout
         if (this._dash._redisplay) {
             this._dash._redisplay();
         }
+    }
+
+    _updateShowAppsButtonHeight() {
+        if (!this._dash || !this._dash._showAppsIcon) {
+            return;
+        }
+        
+        const padding = this._settings.get_int('panel-padding');
+        const dashSize = this._settings.get_int('dash-size');
+        const containerHeight = dashSize - (padding * 2);
+        
+        const showAppsIcon = this._dash._showAppsIcon;
+        
+        // Function to recursively set height on all actors
+        const setHeightRecursive = (actor, depth = 0) => {
+            if (!actor) return;
+            
+            actor.natural_height = containerHeight;
+            actor.min_height = containerHeight;
+            actor.height = containerHeight;
+            
+            log(`${'  '.repeat(depth)}Setting height on: ${actor.constructor.name}`);
+            
+            // Also check for clutter actor children
+            if (actor.get_first_child) {
+                let child = actor.get_first_child();
+                while (child) {
+                    // Only set height on container elements, not on the icon itself
+                    if (child.constructor.name !== 'St_Icon') {
+                        setHeightRecursive(child, depth + 1);
+                    }
+                    child = child.get_next_sibling();
+                }
+            }
+        };
+        
+        setHeightRecursive(showAppsIcon);
+        
+        log(`Show Applications button height set to: ${containerHeight}px`);
     }
 
     _updateShowAppsSeparator() {
@@ -1129,35 +1225,96 @@ export default class ObisionExtensionDash extends Extension {
         if (showSeparator) {
             const position = this._settings.get_string('dash-position');
             const separatorWidth = this._settings.get_int('separator-width');
-            
-            // Create separator with BoxLayout container
-            this._showAppsSeparator = new St.BoxLayout({
-                style_class: 'dash-separator',
-                vertical: (position === 'LEFT' || position === 'RIGHT'),
-            });
-            
-            // Add a simple widget inside with the separator line
-            const separatorLine = new St.Widget({
-                style_class: 'dash-separator-line',
-            });
+            const padding = this._settings.get_int('panel-padding');
+            const dashSize = this._settings.get_int('dash-size');
+            const containerHeight = dashSize - (padding * 2);
             
             if (position === 'TOP' || position === 'BOTTOM') {
                 // Horizontal panel: vertical separator
-                this._showAppsSeparator.y_expand = true;
-                separatorLine.set_style(`width: ${separatorWidth}px; background-color: rgba(0, 0, 0, 0.5);`);
-                this._showAppsSeparator.set_style(`margin-left: 8px; margin-right: 8px; margin-top: 10px;`);
+                this._showAppsSeparator = new St.Widget({
+                    style_class: 'dash-separator',
+                    style: `background-color: rgba(0, 0, 0, 0.5); margin-left: 8px; margin-right: 8px;`,
+                });
+                
+                // Set explicit dimensions like dash children
+                this._showAppsSeparator.natural_width = separatorWidth;
+                this._showAppsSeparator.min_width = separatorWidth;
+                this._showAppsSeparator.width = separatorWidth;
+                this._showAppsSeparator.natural_height = containerHeight;
+                this._showAppsSeparator.min_height = containerHeight;
+                this._showAppsSeparator.height = containerHeight;
             } else {
                 // Vertical panel: horizontal separator
-                this._showAppsSeparator.x_expand = true;
-                separatorLine.set_style(`height: ${separatorWidth}px; background-color: rgba(0, 0, 0, 0.5);`);
-                this._showAppsSeparator.set_style(`margin-top: 8px; margin-bottom: 8px; width: 100%;`);
+                this._showAppsSeparator = new St.Widget({
+                    style_class: 'dash-separator',
+                    style: `background-color: rgba(0, 0, 0, 0.5); margin-top: 8px; margin-bottom: 8px;`,
+                });
+                
+                // Set explicit dimensions like dash children
+                this._showAppsSeparator.natural_width = containerHeight;
+                this._showAppsSeparator.min_width = containerHeight;
+                this._showAppsSeparator.width = containerHeight;
+                this._showAppsSeparator.natural_height = separatorWidth;
+                this._showAppsSeparator.min_height = separatorWidth;
+                this._showAppsSeparator.height = separatorWidth;
             }
-            
-            this._showAppsSeparator.add_child(separatorLine);
             
             // Insert separator after the Show Applications button (at index 1)
             dashBox.insert_child_at_index(this._showAppsSeparator, 1);
             log('Show Applications separator added');
         }
+    }
+
+    _updateIconStyling() {
+        log('_updateIconStyling called');
+        
+        if (!this._dash || !this._dash._box) {
+            log('Dash or dash box not available for icon styling');
+            return;
+        }
+        
+        log('Dash and box available, getting settings');
+        
+        const cornerRadius = this._settings.get_int('icon-corner-radius');
+        const useMainBgColor = this._settings.get_boolean('icon-use-main-bg-color');
+        const iconBgColor = this._settings.get_string('icon-background-color');
+        const mainBgColor = this._settings.get_string('background-color');
+        
+        // Determine which color to use
+        const bgColor = useMainBgColor ? mainBgColor : iconBgColor;
+        
+        log(`_updateIconStyling: cornerRadius=${cornerRadius}, useMainBgColor=${useMainBgColor}, bgColor=${bgColor}`);
+        
+        // Apply styles directly with inline styles (this is the only way to override theme styles)
+        const numChildren = this._dash._box.get_n_children();
+        log(`Applying icon styling to ${numChildren} children`);
+        
+        try {
+            for (let i = 0; i < numChildren; i++) {
+                const child = this._dash._box.get_child_at_index(i);
+                if (!child) {
+                    log(`Child ${i} is null, skipping`);
+                    continue;
+                }
+                
+                // Apply color and border radius to the container (no margin override to let spacing work)
+                const containerStyle = `background-color: ${bgColor} !important; border-radius: ${cornerRadius}px !important; padding: 0px !important;`;
+                child.set_style(containerStyle);
+                log(`Applied container style to child ${i}`);
+                
+                // Make the button and all its children transparent
+                const button = child.first_child;
+                if (button) {
+                    button.set_style('background-color: transparent !important; padding: 4px !important;');
+                    log(`Applied button style to child ${i}`);
+                }
+            }
+            log('Icon styling applied successfully');
+        } catch (e) {
+            log(`Error applying icon styling: ${e.message}`);
+        }
+        
+        // Reapply icon spacing after styling to ensure it's not overridden
+        this._updateIconSpacing();
     }
 }

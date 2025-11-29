@@ -93,6 +93,7 @@
 #dash .show-apps {
     padding: 4px;
     transition-duration: 200ms;
+    background-color: transparent;
 }
 
 .obision-dash-container #dash .app-well-app,
@@ -104,18 +105,62 @@
 
 #dash .app-well-app:hover,
 #dash .show-apps:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    opacity: 0.8;
 }
 
 #dash .app-well-app:active,
 #dash .show-apps:active {
-    background-color: rgba(255, 255, 255, 0.2);
+    opacity: 0.6;
 }
 
 #dash .app-well-app .overview-icon,
 #dash .show-apps .overview-icon {
     padding: 0px;
+    background-color: transparent !important;
+}
+
+.obision-dash-container .overview-icon,
+.obision-dash-container .overview-icon > * {
+    background-color: transparent !important;
+}
+
+/* Center icons within their containers */
+.obision-dash-container #dash .app-well-app,
+.obision-dash-container #dash .show-apps {
+    text-align: center;
+}
+
+/* Force same icon size for all icons including show-apps */
+.obision-dash-container #dash .show-apps .overview-icon > StIcon,
+.obision-dash-container #dash .show-apps .overview-icon StIcon {
+    icon-size: inherit !important;
+}
+
+#dash .app-well-app > StWidget,
+#dash .show-apps > StWidget {
+    background-color: transparent !important;
+}
+
+.app-well-app-running-dot {
+    background-color: transparent !important;
+}
+
+/* Override the grey background from overview-tile */
+.obision-dash-container .overview-tile {
+    background-color: transparent !important;
+}
+
+.obision-dash-container .overview-tile > * {
+    background-color: transparent !important;
+}
+
+/* Make app-well-app button transparent */
+.obision-dash-container #dash .app-well-app {
+    background-color: transparent !important;
+}
+
+.obision-dash-container #dash .app-well-app > * {
+    background-color: transparent !important;
 }
 
 /* Running app indicator */
@@ -129,8 +174,7 @@
 
 /* Focus indicator */
 #dash .app-well-app.focused {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
+    opacity: 0.9;
 }
 
 /* Make icon containers fill available space - force 100% height */

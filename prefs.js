@@ -603,7 +603,7 @@ class IconsSettingsPage extends Adw.PreferencesPage {
             adjustment: new Gtk.Adjustment({
                 lower: 0,
                 upper: 32,
-                step_increment: 2,
+                step_increment: 1,
             }),
         });
         
@@ -618,6 +618,136 @@ class IconsSettingsPage extends Adw.PreferencesPage {
         );
         
         spacingGroup.add(iconSpacingRow);
+
+        // Icon Panel group
+        const iconPanelGroup = new Adw.PreferencesGroup({
+            title: 'Icon Panel',
+            description: 'Configure icon appearance',
+        });
+        this.add(iconPanelGroup);
+
+        // Corner radius
+        const cornerRadiusRow = new Adw.SpinRow({
+            title: 'Corner Round',
+            subtitle: 'Radius for icon background corners in pixels',
+            adjustment: new Gtk.Adjustment({
+                lower: 0,
+                upper: 50,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'icon-corner-radius',
+            cornerRadiusRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        iconPanelGroup.add(cornerRadiusRow);
+
+        // Use main panel background color
+        const useMainBgRow = new Adw.SwitchRow({
+            title: 'Use Main Panel Background Color',
+            subtitle: 'Use the same background color as the main panel',
+        });
+        
+        settings.bind(
+            'icon-use-main-bg-color',
+            useMainBgRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        iconPanelGroup.add(useMainBgRow);
+
+        // Icon background color with color button
+        const iconBgColorRow = new Adw.ActionRow({
+            title: 'Background Color',
+            subtitle: 'Custom background color for icons',
+        });
+        
+        // Create a button with a colored box
+        const iconColorButton = new Gtk.Button({
+            valign: Gtk.Align.CENTER,
+            has_frame: true,
+            width_request: 40,
+            height_request: 40,
+        });
+        
+        // Create a box to show the current color
+        const iconColorBox = new Gtk.Box({
+            width_request: 32,
+            height_request: 32,
+            css_classes: ['icon-color-preview'],
+        });
+        iconColorButton.set_child(iconColorBox);
+        
+        // Parse initial color from settings
+        const iconColorString = settings.get_string('icon-background-color');
+        const iconRgba = new Gdk.RGBA();
+        if (iconRgba.parse(iconColorString)) {
+            iconColorBox.set_css_classes(['icon-color-preview']);
+            const css = `
+                .icon-color-preview {
+                    background-color: ${iconColorString};
+                    border-radius: 4px;
+                }
+            `;
+            const cssProvider = new Gtk.CssProvider();
+            cssProvider.load_from_data(css, -1);
+            iconColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        
+        // Create color chooser dialog
+        const iconColorChooser = new Gtk.ColorChooserDialog({
+            title: 'Choose Icon Background Color',
+            modal: true,
+            use_alpha: true,
+        });
+        
+        if (iconRgba.parse(iconColorString)) {
+            iconColorChooser.set_rgba(iconRgba);
+        }
+        
+        // Connect button click to show color chooser
+        iconColorButton.connect('clicked', () => {
+            iconColorChooser.set_transient_for(iconColorButton.get_root());
+            iconColorChooser.show();
+        });
+        
+        // Connect to color changes in the dialog
+        iconColorChooser.connect('response', (dialog, response) => {
+            if (response === Gtk.ResponseType.OK) {
+                const newColor = iconColorChooser.get_rgba();
+                const colorStr = newColor.to_string();
+                settings.set_string('icon-background-color', colorStr);
+                
+                // Update the color box
+                const css = `
+                    .icon-color-preview {
+                        background-color: ${colorStr};
+                        border-radius: 4px;
+                    }
+                `;
+                const cssProvider = new Gtk.CssProvider();
+                cssProvider.load_from_data(css, -1);
+                iconColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            }
+            dialog.hide();
+        });
+        
+        iconBgColorRow.add_suffix(iconColorButton);
+        iconBgColorRow.activatable_widget = iconColorButton;
+        iconPanelGroup.add(iconBgColorRow);
+
+        // Bind sensitivity: disable color picker when use main bg color is active
+        useMainBgRow.connect('notify::active', () => {
+            iconBgColorRow.sensitive = !useMainBgRow.active;
+        });
+        
+        // Set initial sensitivity
+        iconBgColorRow.sensitive = !settings.get_boolean('icon-use-main-bg-color');
     }
 });
 

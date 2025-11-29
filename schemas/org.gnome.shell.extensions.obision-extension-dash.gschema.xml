@@ -137,5 +137,24 @@
       <description>Width of the separator line in pixels</description>
     </key>
     
+    <key name="icon-corner-radius" type="i">
+      <default>0</default>
+      <range min="0" max="50"/>
+      <summary>Icon corner radius</summary>
+      <description>Corner radius for icon backgrounds in pixels</description>
+    </key>
+    
+    <key name="icon-use-main-bg-color" type="b">
+      <default>true</default>
+      <summary>Use main panel background color</summary>
+      <description>Use the same background color as the main panel for icons</description>
+    </key>
+    
+    <key name="icon-background-color" type="s">
+      <default>"rgba(128,128,128,0.8)"</default>
+      <summary>Icon background color</summary>
+      <description>Custom background color for icons</description>
+    </key>
+    
   </schema>
 </schemalist>
