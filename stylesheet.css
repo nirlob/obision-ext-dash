@@ -103,14 +103,12 @@
     max-height: 100% !important;
 }
 
-#dash .app-well-app:hover,
-#dash .show-apps:hover {
-    opacity: 0.8;
+.obision-dash-container #dash .dash-item-container:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-#dash .app-well-app:active,
-#dash .show-apps:active {
-    opacity: 0.6;
+.obision-dash-container #dash .dash-item-container:active {
+    background-color: rgba(255, 255, 255, 0.25) !important;
 }
 
 #dash .app-well-app .overview-icon,

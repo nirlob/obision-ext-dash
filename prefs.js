@@ -646,6 +646,26 @@ class IconsSettingsPage extends Adw.PreferencesPage {
         
         iconPanelGroup.add(cornerRadiusRow);
 
+        // Icon size multiplier
+        const iconSizeRow = new Adw.SpinRow({
+            title: 'Size',
+            subtitle: 'Icon size multiplier (1-8, where 7 = 0.7)',
+            adjustment: new Gtk.Adjustment({
+                lower: 1,
+                upper: 8,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'icon-size-multiplier',
+            iconSizeRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        iconPanelGroup.add(iconSizeRow);
+
         // Use main panel background color
         const useMainBgRow = new Adw.SwitchRow({
             title: 'Use Main Panel Background Color',

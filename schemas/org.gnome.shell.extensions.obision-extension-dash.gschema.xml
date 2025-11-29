@@ -156,5 +156,12 @@
       <description>Custom background color for icons</description>
     </key>
     
+    <key name="icon-size-multiplier" type="i">
+      <default>7</default>
+      <range min="1" max="8"/>
+      <summary>Icon size multiplier</summary>
+      <description>Multiplier for icon size (1-8, default 7 = 0.7)</description>
+    </key>
+    
   </schema>
 </schemalist>

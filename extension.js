@@ -249,7 +249,13 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-corner-radius', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-use-main-bg-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-background-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-size-multiplier', () => this._updateIconStyling()),
         ];
+        
+        // Monitor window focus changes to update active app indicator
+        this._focusWindowId = global.display.connect('notify::focus-window', () => {
+            this._updateActiveApp();
+        });
         
         // Apply all styles with delays to ensure panel is ready
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
@@ -319,6 +325,11 @@ export default class ObisionExtensionDash extends Extension {
         if (this._monitorsChangedId) {
             Main.layoutManager.disconnect(this._monitorsChangedId);
             this._monitorsChangedId = null;
+        }
+        
+        if (this._focusWindowId) {
+            global.display.disconnect(this._focusWindowId);
+            this._focusWindowId = null;
         }
         
         if (this._settingsChangedIds) {
@@ -1283,7 +1294,14 @@ export default class ObisionExtensionDash extends Extension {
         // Determine which color to use
         const bgColor = useMainBgColor ? mainBgColor : iconBgColor;
         
-        log(`_updateIconStyling: cornerRadius=${cornerRadius}, useMainBgColor=${useMainBgColor}, bgColor=${bgColor}`);
+        // Get icon size multiplier (1-8, default 7 = 0.7)
+        const sizeMultiplier = this._settings.get_int('icon-size-multiplier');
+        const multiplier = sizeMultiplier / 10.0;
+        
+        // Calculate icon size based on multiplier
+        const iconSize = Math.floor(this._dash.iconSize * multiplier);
+        
+        log(`_updateIconStyling: cornerRadius=${cornerRadius}, useMainBgColor=${useMainBgColor}, bgColor=${bgColor}, sizeMultiplier=${sizeMultiplier}, multiplier=${multiplier}, iconSize=${iconSize}`);
         
         // Apply styles directly with inline styles (this is the only way to override theme styles)
         const numChildren = this._dash._box.get_n_children();
@@ -1298,15 +1316,208 @@ export default class ObisionExtensionDash extends Extension {
                 }
                 
                 // Apply color and border radius to the container (no margin override to let spacing work)
-                const containerStyle = `background-color: ${bgColor} !important; border-radius: ${cornerRadius}px !important; padding: 0px !important;`;
+                const containerStyle = `background-color: ${bgColor}; border-radius: ${cornerRadius}px; padding: 0px;`;
                 child.set_style(containerStyle);
                 log(`Applied container style to child ${i}`);
                 
-                // Make the button and all its children transparent
+                // Parse the background color and create a darker version for hover
+                const parseRgba = (colorStr) => {
+                    const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                    if (match) {
+                        return {
+                            r: parseInt(match[1]),
+                            g: parseInt(match[2]),
+                            b: parseInt(match[3]),
+                            a: match[4] ? parseFloat(match[4]) : 1
+                        };
+                    }
+                    return null;
+                };
+                
+                const darkenColor = (colorStr, factor = 0.7) => {
+                    const color = parseRgba(colorStr);
+                    if (color) {
+                        const r = Math.floor(color.r * factor);
+                        const g = Math.floor(color.g * factor);
+                        const b = Math.floor(color.b * factor);
+                        return `rgba(${r}, ${g}, ${b}, ${color.a})`;
+                    }
+                    return colorStr;
+                };
+                
+                const lightenColor = (colorStr, factor = 1.3) => {
+                    const color = parseRgba(colorStr);
+                    if (color) {
+                        const r = Math.min(255, Math.floor(color.r * factor));
+                        const g = Math.min(255, Math.floor(color.g * factor));
+                        const b = Math.min(255, Math.floor(color.b * factor));
+                        return `rgba(${r}, ${g}, ${b}, ${color.a})`;
+                    }
+                    return colorStr;
+                };
+                
+                // Store original colors
+                child._originalBgColor = bgColor;
+                child._hoverBgColor = darkenColor(bgColor, 0.7);
+                child._activeBgColor = lightenColor(bgColor, 1.3);
+                child._cornerRadius = cornerRadius;
+                child._isHovered = false;
+                
+                log(`Original color: ${bgColor}, Hover color: ${child._hoverBgColor}, Active color: ${child._activeBgColor}`);
+                
+                // Store reference to update active state later
+                child._appButton = child.first_child;
+                
+                // Make the button and all its children transparent, and set icon size
                 const button = child.first_child;
                 if (button) {
-                    button.set_style('background-color: transparent !important; padding: 4px !important;');
+                    button.set_style('background-color: transparent; padding: 4px;');
                     log(`Applied button style to child ${i}`);
+                    
+                    // Helper to interpolate between two RGBA colors
+                    const interpolateColor = (color1Str, color2Str, progress) => {
+                        const parseRgba = (colorStr) => {
+                            const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                            if (match) {
+                                return {
+                                    r: parseInt(match[1]),
+                                    g: parseInt(match[2]),
+                                    b: parseInt(match[3]),
+                                    a: match[4] ? parseFloat(match[4]) : 1
+                                };
+                            }
+                            return null;
+                        };
+                        
+                        const c1 = parseRgba(color1Str);
+                        const c2 = parseRgba(color2Str);
+                        
+                        if (c1 && c2) {
+                            const r = Math.floor(c1.r + (c2.r - c1.r) * progress);
+                            const g = Math.floor(c1.g + (c2.g - c1.g) * progress);
+                            const b = Math.floor(c1.b + (c2.b - c1.b) * progress);
+                            const a = c1.a + (c2.a - c1.a) * progress;
+                            return `rgba(${r}, ${g}, ${b}, ${a})`;
+                        }
+                        return color1Str;
+                    };
+                    
+                    // Add hover effect to button via enter/leave events with interpolation
+                    if (!button._hoverEnterSignalId) {
+                        button._hoverEnterSignalId = button.connect('enter-event', (actor) => {
+                            const parent = actor.get_parent();
+                            if (parent) {
+                                parent.remove_all_transitions();
+                                parent._isHovered = true;
+                                
+                                if (parent._animationId) {
+                                    GLib.source_remove(parent._animationId);
+                                    parent._animationId = null;
+                                }
+                                
+                                // Check if app is focused - if so, don't apply hover
+                                if (parent._isFocused) return;
+                                
+                                let step = 0;
+                                const steps = 10;
+                                const stepDuration = 20; // 200ms total
+                                
+                                const animate = () => {
+                                    if (!parent._isHovered || step >= steps) {
+                                        if (parent._isHovered) {
+                                            parent.set_style(`background-color: ${parent._hoverBgColor}; border-radius: ${parent._cornerRadius}px; padding: 0px;`);
+                                        }
+                                        return GLib.SOURCE_REMOVE;
+                                    }
+                                    
+                                    step++;
+                                    const progress = step / steps;
+                                    const currentColor = interpolateColor(parent._originalBgColor, parent._hoverBgColor, progress);
+                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px;`);
+                                    return GLib.SOURCE_CONTINUE;
+                                };
+                                
+                                parent._animationId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, stepDuration, animate);
+                            }
+                        });
+                    }
+                    
+                    if (!button._hoverLeaveSignalId) {
+                        button._hoverLeaveSignalId = button.connect('leave-event', (actor) => {
+                            const parent = actor.get_parent();
+                            if (parent) {
+                                parent.remove_all_transitions();
+                                parent._isHovered = false;
+                                
+                                if (parent._animationId) {
+                                    GLib.source_remove(parent._animationId);
+                                    parent._animationId = null;
+                                }
+                                
+                                // Check if app is focused - return to active color instead of original
+                                const targetColor = parent._isFocused ? parent._activeBgColor : parent._originalBgColor;
+                                
+                                let step = 0;
+                                const steps = 10;
+                                const stepDuration = 20;
+                                
+                                const animate = () => {
+                                    if (parent._isHovered || step >= steps) {
+                                        if (!parent._isHovered) {
+                                            parent.set_style(`background-color: ${targetColor}; border-radius: ${parent._cornerRadius}px; padding: 0px;`);
+                                        }
+                                        return GLib.SOURCE_REMOVE;
+                                    }
+                                    
+                                    step++;
+                                    const progress = 1 - (step / steps);
+                                    const currentColor = interpolateColor(targetColor, parent._hoverBgColor, progress);
+                                    parent.set_style(`background-color: ${currentColor}; border-radius: ${parent._cornerRadius}px; padding: 0px;`);
+                                    return GLib.SOURCE_CONTINUE;
+                                };
+                                
+                                parent._animationId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, stepDuration, animate);
+                            }
+                        });
+                    }
+                    
+                    // Find and resize the actual icon recursively
+                    const findAndResizeIcon = (actor, depth = 0) => {
+                        if (!actor) return false;
+                        
+                        const actorName = actor.constructor ? actor.constructor.name : 'Unknown';
+                        log(`${'  '.repeat(depth)}Checking actor: ${actorName}`);
+                        
+                        if (actorName === 'St_Icon') {
+                            log(`${'  '.repeat(depth)}Found St_Icon, setting size to ${iconSize}px`);
+                            actor.set_icon_size(iconSize);
+                            actor.set_size(iconSize, iconSize);
+                            return true;
+                        }
+                        
+                        // Check if it has an icon property
+                        if (actor.icon && actor.icon.constructor && actor.icon.constructor.name === 'St_Icon') {
+                            log(`${'  '.repeat(depth)}Found icon property, setting size to ${iconSize}px`);
+                            actor.icon.set_icon_size(iconSize);
+                            actor.icon.set_size(iconSize, iconSize);
+                            return true;
+                        }
+                        
+                        // Recursively check children
+                        if (actor.get_first_child) {
+                            let childActor = actor.get_first_child();
+                            while (childActor) {
+                                if (findAndResizeIcon(childActor, depth + 1)) {
+                                    return true;
+                                }
+                                childActor = childActor.get_next_sibling();
+                            }
+                        }
+                        
+                        return false;
+                    };
+                    
+                    findAndResizeIcon(button);
                 }
             }
             log('Icon styling applied successfully');
@@ -1316,5 +1527,38 @@ export default class ObisionExtensionDash extends Extension {
         
         // Reapply icon spacing after styling to ensure it's not overridden
         this._updateIconSpacing();
+        
+        // Monitor focused window changes to update active state
+        this._updateActiveApp();
+    }
+    
+    _updateActiveApp() {
+        if (!this._dash || !this._dash._box) return;
+        
+        const focusedWindow = global.display.get_focus_window();
+        const focusedApp = focusedWindow ? Shell.WindowTracker.get_default().get_window_app(focusedWindow) : null;
+        
+        log(`Focused app: ${focusedApp ? focusedApp.get_id() : 'none'}`);
+        
+        // Update all app buttons
+        const numChildren = this._dash._box.get_n_children();
+        for (let i = 0; i < numChildren; i++) {
+            const child = this._dash._box.get_child_at_index(i);
+            if (!child || !child._appButton) continue;
+            
+            const appButton = child._appButton;
+            const app = appButton.app;
+            
+            if (app && focusedApp && app.get_id() === focusedApp.get_id()) {
+                // This is the focused app - apply active color
+                child.set_style(`background-color: ${child._activeBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px;`);
+                child._isFocused = true;
+                log(`Set active style for app: ${app.get_id()}`);
+            } else if (child._isFocused && !child._isHovered) {
+                // Was focused, no longer - revert to normal
+                child.set_style(`background-color: ${child._originalBgColor}; border-radius: ${child._cornerRadius}px; padding: 0px;`);
+                child._isFocused = false;
+            }
+        }
     }
 }
