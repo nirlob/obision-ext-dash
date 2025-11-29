@@ -41,6 +41,7 @@ export default class ObisionExtensionDash extends Extension {
         this._customClockContainer = null;
         this._customTimeLabel = null;
         this._customDateLabel = null;
+        this._showAppsSeparator = null;
     }
 
     enable() {
@@ -242,6 +243,8 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::date-show-year', () => this._updateDateFormat()),
             this._settings.connect('changed::system-icon-size', () => this._updateSystemIconStyling()),
             this._settings.connect('changed::system-icon-margins', () => this._updateSystemIconStyling()),
+            this._settings.connect('changed::show-apps-separator', () => this._updateShowAppsSeparator()),
+            this._settings.connect('changed::separator-width', () => this._updateShowAppsSeparator()),
         ];
         
         // Apply all styles with delays to ensure panel is ready
@@ -258,6 +261,8 @@ export default class ObisionExtensionDash extends Extension {
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
             this._updateSystemIconStyling();
             this._updateDatePosition();
+            this._moveShowAppsToStart();
+            this._updateShowAppsSeparator();
             return GLib.SOURCE_REMOVE;
         });
         
@@ -341,6 +346,12 @@ export default class ObisionExtensionDash extends Extension {
         if (this._menu) {
             this._menu.destroy();
             this._menu = null;
+        }
+        
+        // Remove separator
+        if (this._showAppsSeparator) {
+            this._showAppsSeparator.destroy();
+            this._showAppsSeparator = null;
         }
         
         // Restore dash to overview
@@ -1061,5 +1072,92 @@ export default class ObisionExtensionDash extends Extension {
         }
         
         // Don't restore original style, we'll apply our spacing
+    }
+
+    _moveShowAppsToStart() {
+        if (!this._dash || !this._dash._showAppsIcon) {
+            log('Dash or showAppsIcon not available');
+            return;
+        }
+        
+        const showAppsIcon = this._dash._showAppsIcon;
+        const dashBox = this._dash._box;
+        
+        if (!dashBox) {
+            log('Dash box not available');
+            return;
+        }
+        
+        // Get current parent of showAppsIcon
+        const currentParent = showAppsIcon.get_parent();
+        if (!currentParent) {
+            log('ShowAppsIcon has no parent');
+            return;
+        }
+        
+        // Remove from current position
+        currentParent.remove_child(showAppsIcon);
+        
+        // Add at the beginning (index 0)
+        dashBox.insert_child_at_index(showAppsIcon, 0);
+        log('Show Applications button moved to start');
+        
+        // Force a redisplay to update the layout
+        if (this._dash._redisplay) {
+            this._dash._redisplay();
+        }
+    }
+
+    _updateShowAppsSeparator() {
+        if (!this._dash || !this._dash._box) {
+            log('Dash or dash box not available');
+            return;
+        }
+        
+        const showSeparator = this._settings.get_boolean('show-apps-separator');
+        const dashBox = this._dash._box;
+        
+        // Remove existing separator if present
+        if (this._showAppsSeparator) {
+            if (this._showAppsSeparator.get_parent()) {
+                this._showAppsSeparator.get_parent().remove_child(this._showAppsSeparator);
+            }
+            this._showAppsSeparator.destroy();
+            this._showAppsSeparator = null;
+        }
+        
+        if (showSeparator) {
+            const position = this._settings.get_string('dash-position');
+            const separatorWidth = this._settings.get_int('separator-width');
+            
+            // Create separator with BoxLayout container
+            this._showAppsSeparator = new St.BoxLayout({
+                style_class: 'dash-separator',
+                vertical: (position === 'LEFT' || position === 'RIGHT'),
+            });
+            
+            // Add a simple widget inside with the separator line
+            const separatorLine = new St.Widget({
+                style_class: 'dash-separator-line',
+            });
+            
+            if (position === 'TOP' || position === 'BOTTOM') {
+                // Horizontal panel: vertical separator
+                this._showAppsSeparator.y_expand = true;
+                separatorLine.set_style(`width: ${separatorWidth}px; background-color: rgba(0, 0, 0, 0.5);`);
+                this._showAppsSeparator.set_style(`margin-left: 8px; margin-right: 8px; margin-top: 10px;`);
+            } else {
+                // Vertical panel: horizontal separator
+                this._showAppsSeparator.x_expand = true;
+                separatorLine.set_style(`height: ${separatorWidth}px; background-color: rgba(0, 0, 0, 0.5);`);
+                this._showAppsSeparator.set_style(`margin-top: 8px; margin-bottom: 8px; width: 100%;`);
+            }
+            
+            this._showAppsSeparator.add_child(separatorLine);
+            
+            // Insert separator after the Show Applications button (at index 1)
+            dashBox.insert_child_at_index(this._showAppsSeparator, 1);
+            log('Show Applications separator added');
+        }
     }
 }

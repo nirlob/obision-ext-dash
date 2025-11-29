@@ -227,6 +227,67 @@ class PanelSettingsPage extends Adw.PreferencesPage {
     }
 });
 
+// Dash Panel Settings Page
+const DashPanelSettingsPage = GObject.registerClass(
+class DashPanelSettingsPage extends Adw.PreferencesPage {
+    constructor(settings) {
+        super({
+            title: 'Dash panel',
+            icon_name: 'view-app-grid-symbolic',
+        });
+
+        // Applications Button group
+        const appsButtonGroup = new Adw.PreferencesGroup({
+            title: 'Applications Button',
+            description: 'Configure Show Applications button',
+        });
+        this.add(appsButtonGroup);
+
+        // Show separator
+        const showSeparatorRow = new Adw.SwitchRow({
+            title: 'Show Separator',
+            subtitle: 'Display separator after the Show Applications button',
+        });
+        
+        settings.bind(
+            'show-apps-separator',
+            showSeparatorRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        appsButtonGroup.add(showSeparatorRow);
+
+        // Separator width
+        const separatorWidthRow = new Adw.SpinRow({
+            title: 'Separator Width',
+            subtitle: 'Width of the separator line in pixels',
+            adjustment: new Gtk.Adjustment({
+                lower: 1,
+                upper: 10,
+                step_increment: 1,
+            }),
+        });
+        
+        settings.bind(
+            'separator-width',
+            separatorWidthRow,
+            'value',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        
+        appsButtonGroup.add(separatorWidthRow);
+
+        // Bind separator width sensitivity to show separator
+        showSeparatorRow.connect('notify::active', () => {
+            separatorWidthRow.sensitive = showSeparatorRow.active;
+        });
+        
+        // Set initial sensitivity
+        separatorWidthRow.sensitive = settings.get_boolean('show-apps-separator');
+    }
+});
+
 // System Panel Settings Page
 const SystemPanelSettingsPage = GObject.registerClass(
 class SystemPanelSettingsPage extends Adw.PreferencesPage {
@@ -570,6 +631,9 @@ export default class ObisionExtensionDashPreferences extends ExtensionPreference
 
         const iconsPage = new IconsSettingsPage(settings);
         window.add(iconsPage);
+
+        const dashPanelPage = new DashPanelSettingsPage(settings);
+        window.add(dashPanelPage);
 
         const systemPanelPage = new SystemPanelSettingsPage(settings);
         window.add(systemPanelPage);

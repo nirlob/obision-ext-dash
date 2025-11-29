@@ -124,5 +124,18 @@
       <description>Margin applied to left and right of each system icon in pixels</description>
     </key>
     
+    <key name="show-apps-separator" type="b">
+      <default>true</default>
+      <summary>Show Applications separator</summary>
+      <description>Show separator after Show Applications button</description>
+    </key>
+    
+    <key name="separator-width" type="i">
+      <default>1</default>
+      <range min="1" max="10"/>
+      <summary>Separator width</summary>
+      <description>Width of the separator line in pixels</description>
+    </key>
+    
   </schema>
 </schemalist>
