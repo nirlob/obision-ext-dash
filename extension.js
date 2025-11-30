@@ -10,6 +10,7 @@ import Pango from 'gi://Pango';
 import Gdk from 'gi://Gdk';
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 
 export default class ObisionExtensionDash extends Extension {
     constructor(metadata) {
@@ -191,6 +192,24 @@ export default class ObisionExtensionDash extends Extension {
         this._panel.add_child(this._appIconsBox);
         this._panel.add_child(this._topBarContainer);
         
+        // Add right-click handler for dash context menu
+        this._appIconsBox.set_reactive(true);
+        this._appIconsBox.connect('button-press-event', (actor, event) => {
+            if (event.get_button() === 3) { // Right click
+                // Only show dash menu if not clicking on an icon
+                const [x, y] = event.get_coords();
+                const iconAtPoint = this._getIconAtPoint(x, y);
+                if (!iconAtPoint) {
+                    this._showDashContextMenu(actor, event);
+                    return Clutter.EVENT_STOP;
+                }
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
+        
+        // We'll add right-click handler for date/time after dateMenu is available
+        // See _setupDateMenuContextMenu() called later
+        
         // Create context menu
         this._createContextMenu();
         
@@ -216,6 +235,17 @@ export default class ObisionExtensionDash extends Extension {
         this._appStateChangedId = this._appSystem.connect('app-state-changed', () => {
             log('App state changed, rebuilding icons');
             this._buildAppIcons();
+        });
+        
+        // Connect to window focus changes
+        this._focusWindowId = global.display.connect('notify::focus-window', () => {
+            this._updateFocusedApp();
+        });
+        
+        // Also track via WindowTracker for better reliability
+        this._windowTracker = Shell.WindowTracker.get_default();
+        this._focusAppId = this._windowTracker.connect('notify::focus-app', () => {
+            this._updateFocusedApp();
         });
         
         // Connect to monitor changes
@@ -262,11 +292,6 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-selected-show-border', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-border-color', () => this._updateIconStyling()),
         ];
-        
-        // Monitor window focus changes to update active app indicator
-        this._focusWindowId = global.display.connect('notify::focus-window', () => {
-            this._updateActiveApp();
-        });
         
         // Apply styles with delays to ensure panel is ready
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
@@ -355,6 +380,18 @@ export default class ObisionExtensionDash extends Extension {
         if (this._appStateChangedId && this._appSystem) {
             this._appSystem.disconnect(this._appStateChangedId);
             this._appStateChangedId = null;
+        }
+        
+        // Disconnect focus window signal
+        if (this._focusWindowId) {
+            global.display.disconnect(this._focusWindowId);
+            this._focusWindowId = null;
+        }
+        
+        // Disconnect focus app signal
+        if (this._focusAppId && this._windowTracker) {
+            this._windowTracker.disconnect(this._focusAppId);
+            this._focusAppId = null;
         }
         
         // Destroy our app icons
@@ -499,8 +536,8 @@ export default class ObisionExtensionDash extends Extension {
         const iconPadding = 8; // 4px padding on each side of icon
         const iconSize = Math.floor(containerHeight - iconPadding);
         
-        // Set spacing on the box
-        this._appIconsBox.set_style(`spacing: ${iconSpacing}px;`);
+        // Set padding on the box via style (spacing handled per-icon with margin-left)
+        this._appIconsBox.set_style(`padding: ${padding}px;`);
         
         // Create Show Apps button first
         this._createShowAppsButton(containerHeight, iconSize);
@@ -525,9 +562,11 @@ export default class ObisionExtensionDash extends Extension {
         
         log(`Total apps to show: ${appList.length}`);
         
-        // Create icon for each app
-        for (const app of appList) {
-            const iconContainer = this._createAppIcon(app, containerHeight, iconSize);
+        // Create icon for each app (pass index to skip spacing on first icon)
+        for (let i = 0; i < appList.length; i++) {
+            const app = appList[i];
+            const isFirstIcon = (i === 0);
+            const iconContainer = this._createAppIcon(app, containerHeight, iconSize, isFirstIcon);
             if (iconContainer) {
                 this._appIconsBox.add_child(iconContainer);
                 this._appIcons.push(iconContainer);
@@ -535,6 +574,9 @@ export default class ObisionExtensionDash extends Extension {
         }
         
         log(`Created ${this._appIcons.length} app icons`);
+        
+        // Update focused app indicator
+        this._updateFocusedApp();
     }
     
     _createShowAppsButton(containerHeight, iconSize) {
@@ -555,7 +597,21 @@ export default class ObisionExtensionDash extends Extension {
         button.set_child(icon);
         
         button.connect('clicked', () => {
-            Main.overview.showApps();
+            // Toggle: if overview is showing, hide it; otherwise show apps
+            if (Main.overview.visible) {
+                Main.overview.hide();
+            } else {
+                Main.overview.showApps();
+            }
+        });
+        
+        // Right-click context menu for show apps button
+        button.connect('button-press-event', (actor, event) => {
+            if (event.get_button() === 3) {
+                this._showShowAppsContextMenu(button, event);
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
         });
         
         // Apply styling
@@ -570,20 +626,21 @@ export default class ObisionExtensionDash extends Extension {
         if (!showSeparator) return;
         
         const separatorWidth = this._settings.get_int('separator-width');
-        const iconSpacing = this._settings.get_int('icon-spacing');
         
-        // Use negative margin to cancel out the icon-spacing from the box
+        // Separator with small fixed margins (not affected by icon-spacing)
+        const separatorMargin = 4;
         const separator = new St.Widget({
-            style: `background-color: rgba(128, 128, 128, 0.5); width: ${separatorWidth}px; height: ${containerHeight}px; margin: 0 -${iconSpacing / 2}px;`,
+            style: `background-color: rgba(128, 128, 128, 0.5); width: ${separatorWidth}px; height: ${containerHeight}px; margin-left: ${separatorMargin}px; margin-right: ${separatorMargin}px;`,
             width: separatorWidth,
             height: containerHeight,
         });
+        separator._isSeparator = true;
         
         this._appIconsBox.add_child(separator);
         this._showAppsSeparator = separator;
     }
     
-    _createAppIcon(app, containerHeight, iconSize) {
+    _createAppIcon(app, containerHeight, iconSize, isFirstIcon = false) {
         const container = new St.Button({
             style_class: 'app-icon-container',
             reactive: true,
@@ -593,17 +650,20 @@ export default class ObisionExtensionDash extends Extension {
             height: containerHeight,
         });
         
+        // Store if first icon (no spacing)
+        container._isFirstIcon = isFirstIcon;
+        
         // Indicator height + spacing
         const indicatorHeight = 3;
         const indicatorSpacing = 1;
         const indicatorTotal = indicatorHeight + indicatorSpacing;
         
-        // Create vertical box - add top margin equal to indicator space minus 1px to shift up slightly
+        // Create vertical box - add top margin equal to indicator space minus 3px to shift up more
         const contentBox = new St.BoxLayout({
             vertical: true,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-            style: `spacing: ${indicatorSpacing}px; margin-top: ${indicatorTotal - 1}px;`,
+            style: `spacing: ${indicatorSpacing}px; margin-top: ${indicatorTotal - 3}px;`,
         });
         
         const icon = app.create_icon_texture(iconSize - 4);
@@ -628,7 +688,7 @@ export default class ObisionExtensionDash extends Extension {
         container.set_child(contentBox);
         container._app = app;
         
-        // Click handler
+        // Click handler (left click)
         container.connect('clicked', () => {
             const windows = app.get_windows();
             if (windows.length > 0) {
@@ -641,15 +701,24 @@ export default class ObisionExtensionDash extends Extension {
             }
         });
         
+        // Right-click context menu
+        container.connect('button-press-event', (actor, event) => {
+            if (event.get_button() === 3) { // Right click
+                this._showAppContextMenu(container, app, event);
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
+        
         // Enable drag for favorites reordering
-        const dominated = AppFavorites.getAppFavorites().getFavorites().some(f => f.get_id() === app.get_id());
-        if (dominated) {
+        const isFavorite = AppFavorites.getAppFavorites().getFavorites().some(f => f.get_id() === app.get_id());
+        if (isFavorite) {
             container._draggable = true;
             this._setupDragAndDrop(container, app);
         }
         
-        // Apply styling
-        this._applyIconContainerStyle(container, containerHeight);
+        // Apply styling (true = is app icon, gets spacing unless first icon)
+        this._applyIconContainerStyle(container, containerHeight, true, isFirstIcon);
         
         // Store app reference and running state
         container._isRunning = isRunning;
@@ -731,6 +800,316 @@ export default class ObisionExtensionDash extends Extension {
         return null;
     }
     
+    _openMenuWithOverlay(menu, menuName) {
+        // Simple approach: just open menu and let it handle focus
+        menu.open();
+        
+        // Use captured-event to detect clicks outside
+        this[`_${menuName}CaptureId`] = global.stage.connect('captured-event', (actor, event) => {
+            if (event.type() === Clutter.EventType.BUTTON_PRESS) {
+                const [x, y] = event.get_coords();
+                const menuActor = menu.actor;
+                if (menuActor) {
+                    const [mx, my] = menuActor.get_transformed_position();
+                    const [mw, mh] = menuActor.get_transformed_size();
+                    
+                    if (x < mx || x > mx + mw || y < my || y > my + mh) {
+                        menu.close();
+                        return Clutter.EVENT_STOP;
+                    }
+                }
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
+        
+        // Cleanup when menu closes
+        menu.connect('open-state-changed', (m, isOpen) => {
+            if (!isOpen) {
+                // Disconnect capture
+                const captureId = this[`_${menuName}CaptureId`];
+                if (captureId) {
+                    global.stage.disconnect(captureId);
+                    this[`_${menuName}CaptureId`] = null;
+                }
+                
+                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    if (this[`_${menuName}Menu`]) {
+                        this[`_${menuName}Menu`].destroy();
+                        this[`_${menuName}Menu`] = null;
+                    }
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+        });
+    }
+    
+    _showAppContextMenu(container, app, event) {
+        // Close any existing menu
+        if (this._appContextMenu) {
+            this._appContextMenu.close();
+            this._appContextMenu.destroy();
+            this._appContextMenu = null;
+        }
+        
+        // Create popup menu
+        this._appContextMenu = new PopupMenu.PopupMenu(container, 0.5, St.Side.BOTTOM);
+        Main.uiGroup.add_child(this._appContextMenu.actor);
+        this._appContextMenu.actor.add_style_class_name('app-menu');
+        
+        const appInfo = app.get_app_info();
+        const isFavorite = AppFavorites.getAppFavorites().isFavorite(app.get_id());
+        const isRunning = app.get_state() === Shell.AppState.RUNNING;
+        
+        // New Window
+        if (appInfo && appInfo.supports_uris()) {
+            const newWindowItem = this._appContextMenu.addAction('Nueva ventana', () => {
+                app.open_new_window(-1);
+            });
+        }
+        
+        // Separator
+        this._appContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        // Add/Remove from favorites
+        if (isFavorite) {
+            this._appContextMenu.addAction('Quitar de favoritos', () => {
+                AppFavorites.getAppFavorites().removeFavorite(app.get_id());
+            });
+        } else {
+            this._appContextMenu.addAction('Añadir a favoritos', () => {
+                AppFavorites.getAppFavorites().addFavorite(app.get_id());
+            });
+        }
+        
+        // Show Details (open in Software Center)
+        if (appInfo) {
+            this._appContextMenu.addAction('Mostrar detalles', () => {
+                const id = app.get_id();
+                const args = GLib.Variant.new('(ss)', [id, '']);
+                Gio.DBus.get(Gio.BusType.SESSION, null, (source, result) => {
+                    try {
+                        const connection = Gio.DBus.get_finish(result);
+                        connection.call(
+                            'org.gnome.Software',
+                            '/org/gnome/Software',
+                            'org.gtk.Actions',
+                            'Activate',
+                            new GLib.Variant('(sava{sv})', ['details', [args], null]),
+                            null,
+                            Gio.DBusCallFlags.NONE,
+                            -1,
+                            null,
+                            null
+                        );
+                    } catch (e) {
+                        log(`Error opening app details: ${e.message}`);
+                    }
+                });
+            });
+        }
+        
+        // Separator before quit
+        if (isRunning) {
+            this._appContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            
+            // Quit
+            this._appContextMenu.addAction('Cerrar', () => {
+                app.request_quit();
+            });
+        }
+        
+        // Store menu reference for helper
+        this._appContextMenuMenu = this._appContextMenu;
+        
+        // Use overlay helper to close on any click outside
+        this._openMenuWithOverlay(this._appContextMenu, 'appContext');
+    }
+
+    _showShowAppsContextMenu(button, event) {
+        // Close any existing menu
+        if (this._showAppsContextMenu) {
+            this._showAppsContextMenu.close();
+            this._showAppsContextMenu.destroy();
+            this._showAppsContextMenu = null;
+        }        // Create popup menu
+        this._showAppsContextMenu = new PopupMenu.PopupMenu(button, 0.5, St.Side.BOTTOM);
+        Main.uiGroup.add_child(this._showAppsContextMenu.actor);
+        this._showAppsContextMenu.actor.add_style_class_name('app-menu');
+        
+        // Dummy options
+        this._showAppsContextMenu.addAction('Mostrar todas las aplicaciones', () => {
+            Main.overview.showApps();
+        });
+        
+        this._showAppsContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        this._showAppsContextMenu.addAction('Configuración', () => {
+            const settings = Shell.AppSystem.get_default().lookup_app('gnome-control-center.desktop');
+            if (settings) {
+                settings.activate();
+            }
+        });
+        
+        this._showAppsContextMenu.addAction('Estado del sistema', () => {
+            const monitor = Shell.AppSystem.get_default().lookup_app('gnome-system-monitor.desktop');
+            if (monitor) {
+                monitor.activate();
+            }
+        });
+        
+        // Store menu reference for helper
+        this._showAppsContextMenuMenu = this._showAppsContextMenu;
+        
+        // Use overlay helper to close on any click outside
+        this._openMenuWithOverlay(this._showAppsContextMenu, 'showAppsContext');
+    }
+    
+    _showDashContextMenu(actor, event) {
+        // Close any existing menu
+        if (this._dashContextMenu) {
+            this._dashContextMenu.close();
+            this._dashContextMenu.destroy();
+            this._dashContextMenu = null;
+        }
+        
+        // Create popup menu
+        this._dashContextMenu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.BOTTOM);
+        Main.uiGroup.add_child(this._dashContextMenu.actor);
+        this._dashContextMenu.actor.add_style_class_name('app-menu');
+        
+        // Dash options
+        this._dashContextMenu.addAction('Preferencias del dash', () => {
+            this._extension.openPreferences();
+        });
+        
+        this._dashContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        this._dashContextMenu.addAction('Configuración del sistema', () => {
+            const settings = Shell.AppSystem.get_default().lookup_app('gnome-control-center.desktop');
+            if (settings) {
+                settings.activate();
+            }
+        });
+        
+        this._dashContextMenu.addAction('Estado del sistema', () => {
+            const monitor = Shell.AppSystem.get_default().lookup_app('gnome-system-monitor.desktop');
+            if (monitor) {
+                monitor.activate();
+            }
+        });
+        
+        // Store menu reference for helper
+        this._dashContextMenuMenu = this._dashContextMenu;
+        
+        // Use overlay helper to close on any click outside
+        this._openMenuWithOverlay(this._dashContextMenu, 'dashContext');
+    }
+    
+    _showDateTimeContextMenu(actor, event) {
+        // Close any existing menu
+        if (this._dateTimeContextMenu) {
+            this._dateTimeContextMenu.close();
+            this._dateTimeContextMenu.destroy();
+            this._dateTimeContextMenu = null;
+        }
+        
+        // Create popup menu
+        this._dateTimeContextMenu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.BOTTOM);
+        Main.uiGroup.add_child(this._dateTimeContextMenu.actor);
+        this._dateTimeContextMenu.actor.add_style_class_name('app-menu');
+        
+        // Date/Time options
+        this._dateTimeContextMenu.addAction('Ajustes de fecha y hora', () => {
+            const settings = Shell.AppSystem.get_default().lookup_app('gnome-control-center.desktop');
+            if (settings) {
+                settings.launch_action('datetime', global.get_current_time());
+            }
+        });
+        
+        this._dateTimeContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        
+        this._dateTimeContextMenu.addAction('Abrir Relojes', () => {
+            const clocks = Shell.AppSystem.get_default().lookup_app('org.gnome.clocks.desktop');
+            if (clocks) {
+                clocks.activate();
+            } else {
+                // Try alternative app ID
+                const altClocks = Shell.AppSystem.get_default().lookup_app('gnome-clocks.desktop');
+                if (altClocks) {
+                    altClocks.activate();
+                }
+            }
+        });
+        
+        // Open the menu
+        this._dateTimeContextMenu.open();
+        
+        // Close menu when clicking outside
+        this._dateTimeContextMenu.connect('open-state-changed', (menu, isOpen) => {
+            if (!isOpen) {
+                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    if (this._dateTimeContextMenu) {
+                        this._dateTimeContextMenu.destroy();
+                        this._dateTimeContextMenu = null;
+                    }
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+        });
+    }
+    
+    _setupDateMenuContextMenu() {
+        // Disabled for now - GNOME's dateMenu handling is complex
+        // Right-click will show the default calendar/notifications panel
+        return;
+    }
+    
+    _closeAllContextMenus() {
+        if (this._appContextMenu) {
+            this._appContextMenu.close();
+        }
+        if (this._showAppsContextMenu) {
+            this._showAppsContextMenu.close();
+        }
+        if (this._dashContextMenu) {
+            this._dashContextMenu.close();
+        }
+    }
+    
+    _updateFocusedApp() {
+        // Close any open menus when focus changes
+        this._closeAllContextMenus();
+        
+        // Use WindowTracker.focus_app which is more reliable
+        const tracker = Shell.WindowTracker.get_default();
+        const focusedApp = tracker.focus_app;
+        
+        log(`Focus changed: ${focusedApp ? focusedApp.get_id() : 'none'}`);
+        
+        for (const container of this._appIcons) {
+            if (!container._app) continue;
+            
+            const isFocused = focusedApp && container._app.get_id() === focusedApp.get_id();
+            
+            if (isFocused) {
+                // Add focus highlight
+                container._isFocused = true;
+                if (container._runningIndicator) {
+                    container._runningIndicator.set_style('background-color: #3584e4; border-radius: 2px;');
+                    container._runningIndicator.set_width(14);
+                }
+            } else {
+                // Remove focus highlight
+                container._isFocused = false;
+                if (container._runningIndicator) {
+                    const isRunning = container._app.get_state() === Shell.AppState.RUNNING;
+                    container._runningIndicator.set_style(`background-color: ${isRunning ? 'white' : 'transparent'}; border-radius: 1px;`);
+                    container._runningIndicator.set_width(5);
+                }
+            }
+        }
+    }
+    
     _highlightDropTarget(container) {
         this._clearDropHighlight();
         container._isDropTarget = true;
@@ -748,7 +1127,7 @@ export default class ObisionExtensionDash extends Extension {
         }
     }
     
-    _applyIconContainerStyle(container, containerHeight) {
+    _applyIconContainerStyle(container, containerHeight, isAppIcon = false, isFirstIcon = false) {
         const cornerRadius = this._settings.get_int('icon-corner-radius');
         const useMainBgColor = this._settings.get_boolean('icon-use-main-bg-color');
         const iconBgColor = this._settings.get_string('icon-background-color');
@@ -759,17 +1138,25 @@ export default class ObisionExtensionDash extends Extension {
         const bgColor = useMainBgColor ? mainBgColor : iconBgColor;
         const borderStyle = normalShowBorder ? `border: 2px solid ${normalBorderColor};` : '';
         
-        container.set_style(`
+        // Apply spacing only to app icons that are NOT the first one after separator
+        const iconSpacing = (isAppIcon && !isFirstIcon) ? this._settings.get_int('icon-spacing') : 0;
+        const marginStyle = iconSpacing > 0 ? `margin-left: ${iconSpacing}px;` : '';
+        
+        const baseStyle = `
             background-color: ${bgColor};
             border-radius: ${cornerRadius}px;
             padding: 4px;
+            ${marginStyle}
             ${borderStyle}
-        `);
+        `;
         
-        // Store colors for hover effects
+        container.set_style(baseStyle);
+        
+        // Store for hover effects
         container._originalBgColor = bgColor;
         container._cornerRadius = cornerRadius;
         container._normalBorderStyle = borderStyle;
+        container._marginStyle = marginStyle;
         container._hoverProgress = 0;
         container._animationId = null;
         
@@ -827,6 +1214,7 @@ export default class ObisionExtensionDash extends Extension {
                 background-color: ${currentColor};
                 border-radius: ${container._cornerRadius}px;
                 padding: 4px;
+                ${container._marginStyle || ''}
                 ${currentBorder}
             `);
             
@@ -950,7 +1338,11 @@ export default class ObisionExtensionDash extends Extension {
         if (!this._appIconsBox) return;
         
         const padding = this._settings.get_int('panel-padding');
+        const iconSpacing = this._settings.get_int('icon-spacing');
         this._appIconsBox.set_style(`padding: ${padding}px;`);
+        if (this._appIconsBox.layout_manager) {
+            this._appIconsBox.layout_manager.spacing = iconSpacing;
+        }
         
         // Update dash size when padding changes
         this._updatePanelPosition();
@@ -1116,6 +1508,9 @@ export default class ObisionExtensionDash extends Extension {
             
             // Save original style
             this._originalDateMenuStyle = this._dateMenu.container.get_style();
+            
+            // Add right-click handler to dateMenu
+            this._setupDateMenuContextMenu();
         }
         
         if (datePosition === 'down') {
