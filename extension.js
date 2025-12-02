@@ -1355,7 +1355,7 @@ export default class ObisionExtensionDash extends Extension {
         this._showAppsContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         // Dash Preferences
-        this._showAppsContextMenu.addAction('Dash Preferences', () => {
+        this._showAppsContextMenu.addAction('Dash Preferences...', () => {
             this._openOrFocusPreferences();
         });
 
@@ -1399,7 +1399,7 @@ export default class ObisionExtensionDash extends Extension {
         this._dashContextMenu._anchor = anchor;
 
         // Dash options
-        this._dashContextMenu.addAction('Dash Preferences', () => {
+        this._dashContextMenu.addAction('Dash Preferences...', () => {
             this._openOrFocusPreferences();
         });
 
