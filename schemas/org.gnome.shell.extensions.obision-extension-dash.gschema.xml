@@ -9,7 +9,7 @@
     </key>
     
     <key name="dash-size" type="i">
-      <default>80</default>
+      <default>64</default>
       <range min="40" max="200"/>
       <summary>Dash size</summary>
       <description>Width (for left/right) or height (for top/bottom) of the dash in pixels</description>
@@ -75,7 +75,7 @@
     </key>
     
     <key name="background-color" type="s">
-      <default>"rgba(0,0,0,0.8)"</default>
+      <default>"rgba(46,44,44,0.8)"</default>
       <summary>Background color</summary>
       <description>Solid background color for the panel</description>
     </key>
