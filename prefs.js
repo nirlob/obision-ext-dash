@@ -248,6 +248,109 @@ const PanelSettingsPage = GObject.registerClass(
 
             // Set initial sensitivity
             updateBackgroundSensitivity();
+
+            // Separator group
+            const separatorGroup = new Adw.PreferencesGroup({
+                title: 'Separator',
+                description: 'Line between panel and desktop',
+            });
+            this.add(separatorGroup);
+
+            // Separator visible
+            const separatorVisibleRow = new Adw.SwitchRow({
+                title: 'Visible',
+                subtitle: 'Show separator line between panel and desktop',
+            });
+
+            settings.bind(
+                'panel-separator-visible',
+                separatorVisibleRow,
+                'active',
+                Gio.SettingsBindFlags.DEFAULT
+            );
+
+            separatorGroup.add(separatorVisibleRow);
+
+            // Separator color
+            const separatorColorRow = new Adw.ActionRow({
+                title: 'Color',
+                subtitle: 'Color of the separator line',
+            });
+
+            const sepColorButton = new Gtk.Button({
+                valign: Gtk.Align.CENTER,
+                has_frame: true,
+                width_request: 40,
+                height_request: 40,
+            });
+
+            const sepColorBox = new Gtk.Box({
+                width_request: 32,
+                height_request: 32,
+                css_classes: ['separator-color-preview'],
+            });
+            sepColorButton.set_child(sepColorBox);
+
+            const sepColorString = settings.get_string('panel-separator-color');
+            const sepRgba = new Gdk.RGBA();
+            if (sepRgba.parse(sepColorString)) {
+                const sepCss = `
+                .separator-color-preview {
+                    background-color: ${sepColorString};
+                    border-radius: 4px;
+                }
+            `;
+                const sepCssProvider = new Gtk.CssProvider();
+                sepCssProvider.load_from_data(sepCss, -1);
+                sepColorBox.get_style_context().add_provider(sepCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            }
+
+            const sepColorChooser = new Gtk.ColorChooserDialog({
+                title: 'Choose Separator Color',
+                modal: true,
+                use_alpha: true,
+            });
+
+            if (sepRgba.parse(sepColorString)) {
+                sepColorChooser.set_rgba(sepRgba);
+            }
+
+            sepColorButton.connect('clicked', () => {
+                sepColorChooser.set_transient_for(sepColorButton.get_root());
+                sepColorChooser.show();
+            });
+
+            sepColorChooser.connect('response', (dialog, response) => {
+                if (response === Gtk.ResponseType.OK) {
+                    const newColor = sepColorChooser.get_rgba();
+                    const colorStr = newColor.to_string();
+                    settings.set_string('panel-separator-color', colorStr);
+
+                    const sepCss = `
+                    .separator-color-preview {
+                        background-color: ${colorStr};
+                        border-radius: 4px;
+                    }
+                `;
+                    const sepCssProvider = new Gtk.CssProvider();
+                    sepCssProvider.load_from_data(sepCss, -1);
+                    sepColorBox.get_style_context().add_provider(sepCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+                }
+                dialog.hide();
+            });
+
+            separatorColorRow.add_suffix(sepColorButton);
+            separatorColorRow.activatable_widget = sepColorButton;
+            separatorGroup.add(separatorColorRow);
+
+            // Bind sensitivity of separator options to visible switch
+            const updateSeparatorSensitivity = () => {
+                const isVisible = separatorVisibleRow.active;
+                separatorColorRow.sensitive = isVisible;
+            };
+
+            separatorVisibleRow.connect('notify::active', updateSeparatorSensitivity);
+            updateSeparatorSensitivity();
         }
     });
 

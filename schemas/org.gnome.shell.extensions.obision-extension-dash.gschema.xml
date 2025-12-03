@@ -35,6 +35,32 @@
       <description>Hide dash when not in use</description>
     </key>
     
+    <key name="panel-separator-visible" type="b">
+      <default>false</default>
+      <summary>Panel separator visible</summary>
+      <description>Show separator line between panel and desktop</description>
+    </key>
+    
+    <key name="panel-separator-size" type="i">
+      <default>1</default>
+      <range min="1" max="10"/>
+      <summary>Panel separator size</summary>
+      <description>Size of the separator line in pixels</description>
+    </key>
+    
+    <key name="panel-separator-margin" type="i">
+      <default>0</default>
+      <range min="0" max="20"/>
+      <summary>Panel separator margin</summary>
+      <description>Margin between separator and desktop</description>
+    </key>
+    
+    <key name="panel-separator-color" type="s">
+      <default>"rgba(255,255,255,0.3)"</default>
+      <summary>Panel separator color</summary>
+      <description>Color of the separator line</description>
+    </key>
+    
     <key name="transparent-background" type="b">
       <default>false</default>
       <summary>Transparent background</summary>

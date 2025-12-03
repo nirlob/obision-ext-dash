@@ -61,6 +61,8 @@ export default class ObisionExtensionDash extends Extension {
         this._hoverZone = null;
         // Show desktop button
         this._showDesktopButton = null;
+        // Panel separator
+        this._panelSeparator = null;
         // New: our own app icons
         this._appIconsBox = null;
         this._appIcons = [];
@@ -392,6 +394,9 @@ export default class ObisionExtensionDash extends Extension {
             trackFullscreen: true,
         });
 
+        // Create panel separator (line between panel and desktop)
+        this._createPanelSeparator();
+
         // Position the panel
         this._updatePanelPosition();
         this._updatePanelPadding();
@@ -439,12 +444,18 @@ export default class ObisionExtensionDash extends Extension {
         this._settingsChangedIds = [
             this._settings.connect('changed::dash-position', () => {
                 this._updatePanelPosition();
+                this._updatePanelSeparator();
+                this._queueWorkAreaUpdate();
                 // Update hover zone position if auto-hide is enabled
                 if (this._autoHideEnabled) {
                     this._createHoverZone();
                 }
             }),
-            this._settings.connect('changed::dash-size', () => this._updatePanelPosition()),
+            this._settings.connect('changed::dash-size', () => {
+                this._updatePanelPosition();
+                this._updatePanelSeparator();
+                this._queueWorkAreaUpdate();
+            }),
             this._settings.connect('changed::icon-spacing', () => this._updateIconSpacing()),
             this._settings.connect('changed::panel-padding', () => this._updatePanelPadding()),
             this._settings.connect('changed::transparent-background', () => {
@@ -473,6 +484,8 @@ export default class ObisionExtensionDash extends Extension {
             }),
             this._settings.connect('changed::date-position', () => this._updateDatePosition()),
             this._settings.connect('changed::date-spacing', () => this._updateDateSpacing()),
+            this._settings.connect('changed::panel-separator-visible', () => this._updatePanelSeparator()),
+            this._settings.connect('changed::panel-separator-color', () => this._updatePanelSeparator()),
             this._settings.connect('changed::time-font-size', () => this._updateDateFontSize()),
             this._settings.connect('changed::time-font-bold', () => this._updateDateFontSize()),
             this._settings.connect('changed::date-font-size', () => this._updateDateFontSize()),
@@ -726,6 +739,12 @@ export default class ObisionExtensionDash extends Extension {
             this._showDesktopButton = null;
         }
 
+        if (this._panelSeparator) {
+            Main.layoutManager.removeChrome(this._panelSeparator);
+            this._panelSeparator.destroy();
+            this._panelSeparator = null;
+        }
+
         if (this._scrollContainer) {
             this._scrollContainer.destroy();
             this._scrollContainer = null;
@@ -908,6 +927,77 @@ export default class ObisionExtensionDash extends Extension {
         this._showAppsContainer.destroy_all_children();
         this._showAppsContainer.add_child(button);
         this._showAppsButton = button;
+    }
+
+    _createPanelSeparator() {
+        // Simple 1px separator line - does not affect struts
+        this._panelSeparator = new St.Widget({
+            name: 'obision-panel-separator',
+            reactive: false,
+        });
+
+        // Add to layout manager - does NOT affect struts (just visual)
+        Main.layoutManager.addChrome(this._panelSeparator, {
+            affectsStruts: false,
+            trackFullscreen: true,
+        });
+
+        // Update separator style and position
+        this._updatePanelSeparator();
+    }
+
+    _updatePanelSeparator() {
+        if (!this._panelSeparator || !this._panel) return;
+
+        const visible = this._settings.get_boolean('panel-separator-visible');
+        const color = this._settings.get_string('panel-separator-color');
+        const position = this._settings.get_string('dash-position');
+        const dashSize = this._settings.get_int('dash-size');
+
+        if (!visible) {
+            this._panelSeparator.hide();
+            return;
+        }
+
+        this._panelSeparator.show();
+
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor) return;
+
+        let x, y, width, height;
+        const size = 1; // Always 1px
+
+        // Separator touches the panel
+        switch (position) {
+            case 'BOTTOM':
+                width = monitor.width;
+                height = size;
+                x = monitor.x;
+                y = monitor.y + monitor.height - dashSize - size;
+                break;
+            case 'TOP':
+                width = monitor.width;
+                height = size;
+                x = monitor.x;
+                y = monitor.y + dashSize;
+                break;
+            case 'LEFT':
+                width = size;
+                height = monitor.height;
+                x = monitor.x + dashSize;
+                y = monitor.y;
+                break;
+            case 'RIGHT':
+                width = size;
+                height = monitor.height;
+                x = monitor.x + monitor.width - dashSize - size;
+                y = monitor.y;
+                break;
+        }
+
+        this._panelSeparator.set_position(x, y);
+        this._panelSeparator.set_size(width, height);
+        this._panelSeparator.set_style(`background-color: ${color};`);
     }
 
     _createShowDesktopButton() {
@@ -2249,6 +2339,31 @@ export default class ObisionExtensionDash extends Extension {
             this._hidePanel();
             return GLib.SOURCE_REMOVE;
         });
+
+        // Recalculate work area - panel no longer takes space when auto-hide is enabled
+        // Re-register panel chrome without affecting struts
+        if (this._panel) {
+            try {
+                Main.layoutManager.removeChrome(this._panel);
+            } catch (e) { }
+            Main.layoutManager.addChrome(this._panel, {
+                affectsStruts: false,
+                trackFullscreen: true,
+            });
+        }
+        // Also hide separator from struts
+        if (this._panelSeparator) {
+            try {
+                Main.layoutManager.removeChrome(this._panelSeparator);
+            } catch (e) { }
+            Main.layoutManager.addChrome(this._panelSeparator, {
+                affectsStruts: false,
+                trackFullscreen: true,
+            });
+        }
+        if (Main.layoutManager._queueUpdateRegions) {
+            Main.layoutManager._queueUpdateRegions();
+        }
     }
 
     _disableAutoHide() {
@@ -2280,6 +2395,31 @@ export default class ObisionExtensionDash extends Extension {
 
         // Show the panel immediately
         this._showPanelImmediate();
+
+        // Recalculate work area - panel takes space again when auto-hide is disabled
+        // Re-register panel chrome to update struts
+        if (this._panel) {
+            try {
+                Main.layoutManager.removeChrome(this._panel);
+            } catch (e) { }
+            Main.layoutManager.addChrome(this._panel, {
+                affectsStruts: true,
+                trackFullscreen: true,
+            });
+        }
+        // Also re-register separator with struts
+        if (this._panelSeparator && this._settings.get_boolean('panel-separator-visible')) {
+            try {
+                Main.layoutManager.removeChrome(this._panelSeparator);
+            } catch (e) { }
+            Main.layoutManager.addChrome(this._panelSeparator, {
+                affectsStruts: true,
+                trackFullscreen: true,
+            });
+        }
+        if (Main.layoutManager._queueUpdateRegions) {
+            Main.layoutManager._queueUpdateRegions();
+        }
     }
 
     _createHoverZone() {
@@ -2382,31 +2522,42 @@ export default class ObisionExtensionDash extends Extension {
         const monitor = Main.layoutManager.primaryMonitor;
         const position = this._settings.get_string('dash-position');
         const dashSize = this._settings.get_int('dash-size');
+        const separatorVisible = this._settings.get_boolean('panel-separator-visible');
+        const separatorSize = 1; // Always 1px
 
         let targetX, targetY;
+        let sepTargetX, sepTargetY;
 
         switch (position) {
             case 'TOP':
                 targetX = monitor.x;
                 targetY = monitor.y;
+                sepTargetX = monitor.x;
+                sepTargetY = monitor.y + dashSize;
                 break;
             case 'BOTTOM':
                 targetX = monitor.x;
                 targetY = monitor.y + monitor.height - this._panel.height;
+                sepTargetX = monitor.x;
+                sepTargetY = monitor.y + monitor.height - dashSize - separatorSize;
                 break;
             case 'LEFT':
                 targetX = monitor.x;
                 targetY = monitor.y;
+                sepTargetX = monitor.x + dashSize;
+                sepTargetY = monitor.y;
                 break;
             case 'RIGHT':
                 targetX = monitor.x + monitor.width - dashSize;
                 targetY = monitor.y;
+                sepTargetX = monitor.x + monitor.width - dashSize - separatorSize;
+                sepTargetY = monitor.y;
                 break;
             default:
                 return;
         }
 
-        // Animate panel in
+        // Animate panel in (no work area update - auto-hide shows panel over desktop)
         this._panel.ease({
             x: targetX,
             y: targetY,
@@ -2414,6 +2565,16 @@ export default class ObisionExtensionDash extends Extension {
             duration: 200,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
+
+        // Also animate separator from outside the screen (same direction as panel)
+        if (this._panelSeparator && separatorVisible) {
+            this._panelSeparator.ease({
+                x: sepTargetX,
+                y: sepTargetY,
+                duration: 200,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
     }
 
     _showPanelImmediate() {
@@ -2422,8 +2583,9 @@ export default class ObisionExtensionDash extends Extension {
         this._panelHidden = false;
         this._panel.opacity = 255;
 
-        // Restore position
+        // Restore position (no work area update when disabling auto-hide, _updatePanelPosition handles it)
         this._updatePanelPosition();
+        this._updatePanelSeparator();
     }
 
     _hidePanel() {
@@ -2442,33 +2604,50 @@ export default class ObisionExtensionDash extends Extension {
 
         const monitor = Main.layoutManager.primaryMonitor;
         const position = this._settings.get_string('dash-position');
+        const separatorSize = 1; // Always 1px
 
         let targetX = this._panel.x;
         let targetY = this._panel.y;
+        let sepTargetX = this._panelSeparator ? this._panelSeparator.x : 0;
+        let sepTargetY = this._panelSeparator ? this._panelSeparator.y : 0;
 
-        // Move panel off-screen based on position
+        // Move panel and separator off-screen based on position
         switch (position) {
             case 'TOP':
                 targetY = monitor.y - this._panel.height;
+                sepTargetY = monitor.y - this._panel.height - separatorSize;
                 break;
             case 'BOTTOM':
                 targetY = monitor.y + monitor.height;
+                sepTargetY = monitor.y + monitor.height + separatorSize;
                 break;
             case 'LEFT':
                 targetX = monitor.x - this._panel.width;
+                sepTargetX = monitor.x - this._panel.width - separatorSize;
                 break;
             case 'RIGHT':
                 targetX = monitor.x + monitor.width;
+                sepTargetX = monitor.x + monitor.width + separatorSize;
                 break;
         }
 
-        // Animate panel out
+        // Animate panel out (no work area update - auto-hide just hides visually)
         this._panel.ease({
             x: targetX,
             y: targetY,
             duration: 200,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
+
+        // Also animate separator out in the same direction
+        if (this._panelSeparator) {
+            this._panelSeparator.ease({
+                x: sepTargetX,
+                y: sepTargetY,
+                duration: 200,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
     }
 
     _updatePanelBackground() {
