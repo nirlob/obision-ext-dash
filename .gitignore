@@ -9,9 +9,7 @@
 node_modules/
 
 # Build output
-*.zip
-*.shell-extension.zip
-obision-extension-grid@obision.com.shell-extension.zip
+build/
 
 # Compiled schemas
 schemas/gschemas.compiled
