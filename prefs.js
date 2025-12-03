@@ -5,6 +5,91 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import { ExtensionPreferences } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+// Helper function to create a color picker with popover (no modal dialog)
+function createColorPicker(settings, settingKey) {
+    const button = new Gtk.MenuButton({
+        valign: Gtk.Align.CENTER,
+    });
+
+    // Create a drawing area to show the current color
+    const colorPreview = new Gtk.DrawingArea({
+        width_request: 24,
+        height_request: 24,
+    });
+
+    // Parse color and draw
+    const updatePreview = () => {
+        const colorStr = settings.get_string(settingKey);
+        const rgba = new Gdk.RGBA();
+        rgba.parse(colorStr);
+        // Force opaque
+        rgba.alpha = 1.0;
+
+        colorPreview.set_draw_func((area, cr, width, height) => {
+            // Draw color rectangle
+            cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, 1.0);
+            cr.rectangle(0, 0, width, height);
+            cr.fill();
+            // Draw border
+            cr.setSourceRGBA(0.5, 0.5, 0.5, 1.0);
+            cr.setLineWidth(1);
+            cr.rectangle(0.5, 0.5, width - 1, height - 1);
+            cr.stroke();
+        });
+        colorPreview.queue_draw();
+    };
+
+    updatePreview();
+    button.set_child(colorPreview);
+
+    // Create popover with color chooser widget
+    const popover = new Gtk.Popover();
+    const colorChooser = new Gtk.ColorChooserWidget({
+        show_editor: true,
+        use_alpha: false,
+    });
+
+    // Set initial color
+    const initialColor = settings.get_string(settingKey);
+    const rgba = new Gdk.RGBA();
+    if (rgba.parse(initialColor)) {
+        rgba.alpha = 1.0;
+        colorChooser.set_rgba(rgba);
+    }
+
+    // Create a box with the color chooser and an apply button
+    const box = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 8,
+        margin_top: 8,
+        margin_bottom: 8,
+        margin_start: 8,
+        margin_end: 8,
+    });
+
+    box.append(colorChooser);
+
+    const applyButton = new Gtk.Button({
+        label: 'Apply',
+        css_classes: ['suggested-action'],
+    });
+
+    applyButton.connect('clicked', () => {
+        const newColor = colorChooser.get_rgba();
+        // Force opaque color (no alpha)
+        const opaqueColor = `rgb(${Math.round(newColor.red * 255)},${Math.round(newColor.green * 255)},${Math.round(newColor.blue * 255)})`;
+        settings.set_string(settingKey, opaqueColor);
+        updatePreview();
+        popover.popdown();
+    });
+
+    box.append(applyButton);
+    popover.set_child(box);
+    button.set_popover(popover);
+
+    return button;
+}
+
 // Panel Settings Page
 const PanelSettingsPage = GObject.registerClass(
     class PanelSettingsPage extends Adw.PreferencesPage {
@@ -163,76 +248,7 @@ const PanelSettingsPage = GObject.registerClass(
                 subtitle: 'Solid background color for the panel',
             });
 
-            // Create a button with a colored box
-            const colorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            // Create a box to show the current color
-            const colorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['color-preview'],
-            });
-            colorButton.set_child(colorBox);
-
-            // Parse initial color from settings
-            const colorString = settings.get_string('background-color');
-            const rgba = new Gdk.RGBA();
-            if (rgba.parse(colorString)) {
-                colorBox.set_css_classes(['color-preview']);
-                const css = `
-                .color-preview {
-                    background-color: ${colorString};
-                    border-radius: 4px;
-                }
-            `;
-                const cssProvider = new Gtk.CssProvider();
-                cssProvider.load_from_data(css, -1);
-                colorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            // Create color chooser dialog
-            const colorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Background Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (rgba.parse(colorString)) {
-                colorChooser.set_rgba(rgba);
-            }
-
-            // Connect button click to show color chooser
-            colorButton.connect('clicked', () => {
-                colorChooser.set_transient_for(colorButton.get_root());
-                colorChooser.show();
-            });
-
-            // Connect to color changes in the dialog
-            colorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = colorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('background-color', colorStr);
-
-                    // Update the color box
-                    const css = `
-                    .color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const cssProvider = new Gtk.CssProvider();
-                    cssProvider.load_from_data(css, -1);
-                    colorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const colorButton = createColorPicker(settings, 'background-color');
             bgColorRow.add_suffix(colorButton);
             bgColorRow.activatable_widget = colorButton;
             backgroundGroup.add(bgColorRow);
@@ -277,68 +293,7 @@ const PanelSettingsPage = GObject.registerClass(
                 subtitle: 'Color of the separator line',
             });
 
-            const sepColorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            const sepColorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['separator-color-preview'],
-            });
-            sepColorButton.set_child(sepColorBox);
-
-            const sepColorString = settings.get_string('panel-separator-color');
-            const sepRgba = new Gdk.RGBA();
-            if (sepRgba.parse(sepColorString)) {
-                const sepCss = `
-                .separator-color-preview {
-                    background-color: ${sepColorString};
-                    border-radius: 4px;
-                }
-            `;
-                const sepCssProvider = new Gtk.CssProvider();
-                sepCssProvider.load_from_data(sepCss, -1);
-                sepColorBox.get_style_context().add_provider(sepCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            const sepColorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Separator Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (sepRgba.parse(sepColorString)) {
-                sepColorChooser.set_rgba(sepRgba);
-            }
-
-            sepColorButton.connect('clicked', () => {
-                sepColorChooser.set_transient_for(sepColorButton.get_root());
-                sepColorChooser.show();
-            });
-
-            sepColorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = sepColorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('panel-separator-color', colorStr);
-
-                    const sepCss = `
-                    .separator-color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const sepCssProvider = new Gtk.CssProvider();
-                    sepCssProvider.load_from_data(sepCss, -1);
-                    sepColorBox.get_style_context().add_provider(sepCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const sepColorButton = createColorPicker(settings, 'panel-separator-color');
             separatorColorRow.add_suffix(sepColorButton);
             separatorColorRow.activatable_widget = sepColorButton;
             separatorGroup.add(separatorColorRow);
@@ -821,76 +776,7 @@ const IconsSettingsPage = GObject.registerClass(
                 subtitle: 'Custom background color for icons',
             });
 
-            // Create a button with a colored box
-            const iconColorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            // Create a box to show the current color
-            const iconColorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['icon-color-preview'],
-            });
-            iconColorButton.set_child(iconColorBox);
-
-            // Parse initial color from settings
-            const iconColorString = settings.get_string('icon-background-color');
-            const iconRgba = new Gdk.RGBA();
-            if (iconRgba.parse(iconColorString)) {
-                iconColorBox.set_css_classes(['icon-color-preview']);
-                const css = `
-                .icon-color-preview {
-                    background-color: ${iconColorString};
-                    border-radius: 4px;
-                }
-            `;
-                const cssProvider = new Gtk.CssProvider();
-                cssProvider.load_from_data(css, -1);
-                iconColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            // Create color chooser dialog
-            const iconColorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Icon Background Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (iconRgba.parse(iconColorString)) {
-                iconColorChooser.set_rgba(iconRgba);
-            }
-
-            // Connect button click to show color chooser
-            iconColorButton.connect('clicked', () => {
-                iconColorChooser.set_transient_for(iconColorButton.get_root());
-                iconColorChooser.show();
-            });
-
-            // Connect to color changes in the dialog
-            iconColorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = iconColorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('icon-background-color', colorStr);
-
-                    // Update the color box
-                    const css = `
-                    .icon-color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const cssProvider = new Gtk.CssProvider();
-                    cssProvider.load_from_data(css, -1);
-                    iconColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const iconColorButton = createColorPicker(settings, 'icon-background-color');
             iconBgColorRow.add_suffix(iconColorButton);
             iconBgColorRow.activatable_widget = iconColorButton;
             iconPanelGroup.add(iconBgColorRow);
@@ -951,68 +837,7 @@ const IconsSettingsPage = GObject.registerClass(
                 subtitle: 'Color for icon borders in normal state',
             });
 
-            const normalBorderColorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            const normalBorderColorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['normal-border-color-preview'],
-            });
-            normalBorderColorButton.set_child(normalBorderColorBox);
-
-            const normalBorderColorString = settings.get_string('icon-normal-border-color');
-            const normalBorderRgba = new Gdk.RGBA();
-            if (normalBorderRgba.parse(normalBorderColorString)) {
-                const normalBorderCss = `
-                .normal-border-color-preview {
-                    background-color: ${normalBorderColorString};
-                    border-radius: 4px;
-                }
-            `;
-                const normalBorderCssProvider = new Gtk.CssProvider();
-                normalBorderCssProvider.load_from_data(normalBorderCss, -1);
-                normalBorderColorBox.get_style_context().add_provider(normalBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            const normalBorderColorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Normal Border Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (normalBorderRgba.parse(normalBorderColorString)) {
-                normalBorderColorChooser.set_rgba(normalBorderRgba);
-            }
-
-            normalBorderColorButton.connect('clicked', () => {
-                normalBorderColorChooser.set_transient_for(normalBorderColorButton.get_root());
-                normalBorderColorChooser.show();
-            });
-
-            normalBorderColorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = normalBorderColorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('icon-normal-border-color', colorStr);
-
-                    const css = `
-                    .normal-border-color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const cssProvider = new Gtk.CssProvider();
-                    cssProvider.load_from_data(css, -1);
-                    normalBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const normalBorderColorButton = createColorPicker(settings, 'icon-normal-border-color');
             normalBorderColorRow.add_suffix(normalBorderColorButton);
             normalBorderColorRow.activatable_widget = normalBorderColorButton;
             bordersGroup.add(normalBorderColorRow);
@@ -1046,68 +871,7 @@ const IconsSettingsPage = GObject.registerClass(
                 subtitle: 'Color for icon borders in hover state',
             });
 
-            const hoverBorderColorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            const hoverBorderColorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['hover-border-color-preview'],
-            });
-            hoverBorderColorButton.set_child(hoverBorderColorBox);
-
-            const hoverBorderColorString = settings.get_string('icon-hover-border-color');
-            const hoverBorderRgba = new Gdk.RGBA();
-            if (hoverBorderRgba.parse(hoverBorderColorString)) {
-                const hoverBorderCss = `
-                .hover-border-color-preview {
-                    background-color: ${hoverBorderColorString};
-                    border-radius: 4px;
-                }
-            `;
-                const hoverBorderCssProvider = new Gtk.CssProvider();
-                hoverBorderCssProvider.load_from_data(hoverBorderCss, -1);
-                hoverBorderColorBox.get_style_context().add_provider(hoverBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            const hoverBorderColorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Hover Border Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (hoverBorderRgba.parse(hoverBorderColorString)) {
-                hoverBorderColorChooser.set_rgba(hoverBorderRgba);
-            }
-
-            hoverBorderColorButton.connect('clicked', () => {
-                hoverBorderColorChooser.set_transient_for(hoverBorderColorButton.get_root());
-                hoverBorderColorChooser.show();
-            });
-
-            hoverBorderColorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = hoverBorderColorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('icon-hover-border-color', colorStr);
-
-                    const css = `
-                    .hover-border-color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const cssProvider = new Gtk.CssProvider();
-                    cssProvider.load_from_data(css, -1);
-                    hoverBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const hoverBorderColorButton = createColorPicker(settings, 'icon-hover-border-color');
             hoverBorderColorRow.add_suffix(hoverBorderColorButton);
             hoverBorderColorRow.activatable_widget = hoverBorderColorButton;
             bordersGroup.add(hoverBorderColorRow);
@@ -1140,68 +904,7 @@ const IconsSettingsPage = GObject.registerClass(
                 subtitle: 'Color for icon borders in selected state',
             });
 
-            const selectedBorderColorButton = new Gtk.Button({
-                valign: Gtk.Align.CENTER,
-                has_frame: true,
-                width_request: 40,
-                height_request: 40,
-            });
-
-            const selectedBorderColorBox = new Gtk.Box({
-                width_request: 32,
-                height_request: 32,
-                css_classes: ['selected-border-color-preview'],
-            });
-            selectedBorderColorButton.set_child(selectedBorderColorBox);
-
-            const selectedBorderColorString = settings.get_string('icon-selected-border-color');
-            const selectedBorderRgba = new Gdk.RGBA();
-            if (selectedBorderRgba.parse(selectedBorderColorString)) {
-                const selectedBorderCss = `
-                .selected-border-color-preview {
-                    background-color: ${selectedBorderColorString};
-                    border-radius: 4px;
-                }
-            `;
-                const selectedBorderCssProvider = new Gtk.CssProvider();
-                selectedBorderCssProvider.load_from_data(selectedBorderCss, -1);
-                selectedBorderColorBox.get_style_context().add_provider(selectedBorderCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            }
-
-            const selectedBorderColorChooser = new Gtk.ColorChooserDialog({
-                title: 'Choose Selected Border Color',
-                modal: true,
-                use_alpha: true,
-            });
-
-            if (selectedBorderRgba.parse(selectedBorderColorString)) {
-                selectedBorderColorChooser.set_rgba(selectedBorderRgba);
-            }
-
-            selectedBorderColorButton.connect('clicked', () => {
-                selectedBorderColorChooser.set_transient_for(selectedBorderColorButton.get_root());
-                selectedBorderColorChooser.show();
-            });
-
-            selectedBorderColorChooser.connect('response', (dialog, response) => {
-                if (response === Gtk.ResponseType.OK) {
-                    const newColor = selectedBorderColorChooser.get_rgba();
-                    const colorStr = newColor.to_string();
-                    settings.set_string('icon-selected-border-color', colorStr);
-
-                    const css = `
-                    .selected-border-color-preview {
-                        background-color: ${colorStr};
-                        border-radius: 4px;
-                    }
-                `;
-                    const cssProvider = new Gtk.CssProvider();
-                    cssProvider.load_from_data(css, -1);
-                    selectedBorderColorBox.get_style_context().add_provider(cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-                }
-                dialog.hide();
-            });
-
+            const selectedBorderColorButton = createColorPicker(settings, 'icon-selected-border-color');
             selectedBorderColorRow.add_suffix(selectedBorderColorButton);
             selectedBorderColorRow.activatable_widget = selectedBorderColorButton;
             bordersGroup.add(selectedBorderColorRow);
