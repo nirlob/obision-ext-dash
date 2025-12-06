@@ -4,32 +4,38 @@
 
 set -e  # Exit on error
 
-# Get current version from metadata.json
-CURRENT_VERSION=$(jq -r '.version' metadata.json)
+# Get current version from package.json
+CURRENT_VERSION=$(node -p "require('./package.json').version")
 
-# Ask for new version
+# Split version into parts
+IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+MAJOR="${VERSION_PARTS[0]}"
+MINOR="${VERSION_PARTS[1]}"
+PATCH="${VERSION_PARTS[2]}"
+
+# Increment minor version and reset patch to 0
+NEW_MINOR=$((MINOR + 1))
+NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+
 echo "🚀 Creating new release"
-echo "Current version: $CURRENT_VERSION"
+echo "Current version: v$CURRENT_VERSION"
+echo "New version: v$NEW_VERSION"
 echo ""
-read -p "Enter new version number: " NEW_VERSION
-
-if [ -z "$NEW_VERSION" ]; then
-    echo "❌ Error: Version number cannot be empty"
-    exit 1
-fi
-
-echo ""
-echo "📝 Updating version to: $NEW_VERSION"
-echo ""
-
-# Update metadata.json
-echo "📝 Updating metadata.json..."
-jq --arg version "$NEW_VERSION" '.version = ($version | tonumber)' metadata.json > metadata.json.tmp
-mv metadata.json.tmp metadata.json
 
 # Update package.json
 echo "📝 Updating package.json..."
 npm version $NEW_VERSION --no-git-tag-version
+
+# Extract major version for metadata.json (metadata uses single number)
+METADATA_VERSION="${MAJOR}"
+if [ "$NEW_MINOR" -gt 0 ]; then
+    METADATA_VERSION="${MAJOR}${NEW_MINOR}"
+fi
+
+# Update metadata.json
+echo "📝 Updating metadata.json..."
+jq --arg version "$METADATA_VERSION" '.version = ($version | tonumber)' metadata.json > metadata.json.tmp
+mv metadata.json.tmp metadata.json
 
 # Update debian/changelog
 echo "📝 Updating debian/changelog..."
