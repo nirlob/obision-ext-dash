@@ -920,7 +920,7 @@ const IconsSettingsPage = GObject.registerClass(
 
 export default class ObisionExtensionDashPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings('org.gnome.shell.extensions.obision-extension-dash');
+        const settings = this.getSettings('com.obision.extensions.dash');
 
         // Add pages
         const panelPage = new PanelSettingsPage(settings);

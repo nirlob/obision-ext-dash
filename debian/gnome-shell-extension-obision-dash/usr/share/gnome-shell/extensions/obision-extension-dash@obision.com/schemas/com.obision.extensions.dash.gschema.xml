@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.obision-extension-dash" path="/org/gnome/shell/extensions/obision-extension-dash/">
+  <schema id="com.obision.extensions.dash" path="/com/obision/extensions/dash/">
     
     <key name="dash-position" type="s">
       <default>"BOTTOM"</default>

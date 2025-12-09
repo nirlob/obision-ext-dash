@@ -7,5 +7,5 @@
   ],
   "version": 1,
   "url": "https://github.com/nirlob/obision-extension-dash",
-  "settings-schema": "org.gnome.shell.extensions.obision-extension-dash"
+  "settings-schema": "com.obision.extensions.dash"
 }
