@@ -918,6 +918,21 @@ const IconsSettingsPage = GObject.registerClass(
 
             bordersGroup.add(selectedShowBorderRow);
 
+            // Selected use system color switch
+            const selectedUseSystemColorRow = new Adw.SwitchRow({
+                title: 'Selected Use System Highlight Color',
+                subtitle: 'Use the system theme\'s highlight color for selected border',
+            });
+
+            settings.bind(
+                'icon-selected-use-system-color',
+                selectedUseSystemColorRow,
+                'active',
+                Gio.SettingsBindFlags.DEFAULT
+            );
+
+            bordersGroup.add(selectedUseSystemColorRow);
+
             // Selected border color
             const selectedBorderColorRow = new Adw.ActionRow({
                 title: 'Selected Border Color',
@@ -929,9 +944,19 @@ const IconsSettingsPage = GObject.registerClass(
             selectedBorderColorRow.activatable_widget = selectedBorderColorButton;
             bordersGroup.add(selectedBorderColorRow);
 
+            // Bind sensitivity: disable when show border is off or system color is on
+            const updateSelectedBorderColorSensitivity = () => {
+                selectedBorderColorRow.sensitive = selectedShowBorderRow.active && !selectedUseSystemColorRow.active;
+            };
+
+            selectedShowBorderRow.connect('notify::active', updateSelectedBorderColorSensitivity);
+            selectedUseSystemColorRow.connect('notify::active', updateSelectedBorderColorSensitivity);
+            updateSelectedBorderColorSensitivity();
+
+            // Bind use system color row sensitivity to show border switch
             selectedShowBorderRow.bind_property(
                 'active',
-                selectedBorderColorRow,
+                selectedUseSystemColorRow,
                 'sensitive',
                 GObject.BindingFlags.SYNC_CREATE
             );

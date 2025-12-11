@@ -508,6 +508,7 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-hover-show-border', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-hover-border-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-show-border', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-selected-use-system-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-border-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-border-width', () => this._updateIconStyling()),
             this._settings.connect('changed::auto-hide', () => this._updateAutoHide()),
@@ -1112,7 +1113,8 @@ export default class ObisionExtensionDash extends Extension {
             const cornerRadius = button._cornerRadius || this._settings.get_int('icon-corner-radius');
             const marginStyle = button._marginStyle || '';
             const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
-            const selectedBorderColor = this._settings.get_string('icon-selected-border-color');
+            const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
+            const selectedBorderColor = useSystemColor ? this._getSystemHighlightColor() : this._settings.get_string('icon-selected-border-color');
             const borderWidth = this._settings.get_int('icon-border-width');
             const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
             const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
@@ -1765,7 +1767,8 @@ export default class ObisionExtensionDash extends Extension {
 
                 // Apply focused background style - use a visible blue tint
                 const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
-                const selectedBorderColor = this._settings.get_string('icon-selected-border-color');
+                const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
+                const selectedBorderColor = useSystemColor ? this._getSystemHighlightColor() : this._settings.get_string('icon-selected-border-color');
                 const borderWidth = this._settings.get_int('icon-border-width');
                 const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
                 const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
@@ -2031,7 +2034,11 @@ export default class ObisionExtensionDash extends Extension {
         return colorStr;
     }
 
-    _updatePanelPosition() {
+    _getSystemHighlightColor() {
+        // Return GNOME's default blue accent color
+        // This is the standard system highlight color used in GNOME
+        return 'rgb(53, 132, 228)';
+    } _updatePanelPosition() {
         if (!this._panel) return;
 
         const monitor = Main.layoutManager.primaryMonitor;

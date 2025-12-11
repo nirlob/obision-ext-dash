@@ -227,6 +227,12 @@
       <description>Show border around icon backgrounds in selected state</description>
     </key>
     
+    <key name="icon-selected-use-system-color" type="b">
+      <default>false</default>
+      <summary>Use system highlight color for selected border</summary>
+      <description>Use the system theme's highlight color instead of custom color</description>
+    </key>
+    
     <key name="icon-selected-border-color" type="s">
       <default>"rgba(255,255,255,1.0)"</default>
       <summary>Icon selected border color</summary>
