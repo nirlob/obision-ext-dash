@@ -94,20 +94,20 @@
     </key>
     
     <key name="time-font-size" type="i">
-      <default>20</default>
+      <default>15</default>
       <range min="8" max="30"/>
       <summary>Time font size</summary>
       <description>Font size for time text in pixels</description>
     </key>
     
     <key name="time-font-bold" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Time font bold</summary>
       <description>Make time text bold</description>
     </key>
     
     <key name="date-font-size" type="i">
-      <default>15</default>
+      <default>12</default>
       <range min="8" max="30"/>
       <summary>Date font size</summary>
       <description>Font size for date text in pixels</description>
