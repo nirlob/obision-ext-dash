@@ -816,6 +816,26 @@ const IconsSettingsPage = GObject.registerClass(
 
             bordersGroup.add(cornerRadiusRow);
 
+            // Border width
+            const borderWidthRow = new Adw.SpinRow({
+                title: 'Border Width',
+                subtitle: 'Width of icon borders in pixels',
+                adjustment: new Gtk.Adjustment({
+                    lower: 1,
+                    upper: 4,
+                    step_increment: 1,
+                }),
+            });
+
+            settings.bind(
+                'icon-border-width',
+                borderWidthRow,
+                'value',
+                Gio.SettingsBindFlags.DEFAULT
+            );
+
+            bordersGroup.add(borderWidthRow);
+
             // Normal show border switch
             const normalShowBorderRow = new Adw.SwitchRow({
                 title: 'Normal Show Border',

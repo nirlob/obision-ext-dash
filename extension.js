@@ -509,6 +509,7 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-hover-border-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-show-border', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-border-color', () => this._updateIconStyling()),
+            this._settings.connect('changed::icon-border-width', () => this._updateIconStyling()),
             this._settings.connect('changed::auto-hide', () => this._updateAutoHide()),
         ];
 
@@ -1112,12 +1113,15 @@ export default class ObisionExtensionDash extends Extension {
             const marginStyle = button._marginStyle || '';
             const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
             const selectedBorderColor = this._settings.get_string('icon-selected-border-color');
-            const selectedBorderStyle = selectedShowBorder ? `border: 2px solid ${selectedBorderColor};` : '';
+            const borderWidth = this._settings.get_int('icon-border-width');
+            const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
+            const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
+            const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
 
             button.set_style(`
                 background-color: rgba(53, 132, 228, 0.3);
                 border-radius: ${cornerRadius}px;
-                padding: 4px;
+                padding: ${adjustedPadding}px;
                 ${marginStyle}
                 ${selectedBorderStyle}
             `);
@@ -1130,11 +1134,12 @@ export default class ObisionExtensionDash extends Extension {
             const bgColor = button._originalBgColor || 'transparent';
             const marginStyle = button._marginStyle || '';
             const borderStyle = button._normalBorderStyle || '';
+            const adjustedPadding = button._adjustedPadding || 4;
 
             button.set_style(`
                 background-color: ${bgColor};
                 border-radius: ${cornerRadius}px;
-                padding: 4px;
+                padding: ${adjustedPadding}px;
                 ${marginStyle}
                 ${borderStyle}
             `);
@@ -1761,13 +1766,16 @@ export default class ObisionExtensionDash extends Extension {
                 // Apply focused background style - use a visible blue tint
                 const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
                 const selectedBorderColor = this._settings.get_string('icon-selected-border-color');
-                const selectedBorderStyle = selectedShowBorder ? `border: 2px solid ${selectedBorderColor};` : '';
+                const borderWidth = this._settings.get_int('icon-border-width');
+                const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
+                const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
+                const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
 
                 // Use a semi-transparent blue overlay for visibility
                 container.set_style(`
                     background-color: rgba(53, 132, 228, 0.3);
                     border-radius: ${container._cornerRadius}px;
-                    padding: 4px;
+                    padding: ${adjustedPadding}px;
                     ${container._marginStyle || ''}
                     ${selectedBorderStyle}
                 `);
@@ -1785,12 +1793,15 @@ export default class ObisionExtensionDash extends Extension {
                 // Revert to normal background style
                 const normalShowBorder = this._settings.get_boolean('icon-normal-show-border');
                 const normalBorderColor = this._settings.get_string('icon-normal-border-color');
-                const normalBorderStyle = normalShowBorder ? `border: 2px solid ${normalBorderColor};` : '';
+                const borderWidth = this._settings.get_int('icon-border-width');
+                const normalBorderStyle = normalShowBorder ? `border: ${borderWidth}px solid ${normalBorderColor};` : '';
+                const effectiveBorderWidth = normalShowBorder ? borderWidth : 0;
+                const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
 
                 container.set_style(`
                     background-color: ${container._originalBgColor};
                     border-radius: ${container._cornerRadius}px;
-                    padding: 4px;
+                    padding: ${adjustedPadding}px;
                     ${container._marginStyle || ''}
                     ${normalBorderStyle}
                 `);
@@ -1838,7 +1849,11 @@ export default class ObisionExtensionDash extends Extension {
             hoverBgColor = this._lightenColor(bgColor, 1.5);
         }
 
-        const borderStyle = normalShowBorder ? `border: 2px solid ${normalBorderColor};` : '';
+        const borderWidth = this._settings.get_int('icon-border-width');
+        const borderStyle = normalShowBorder ? `border: ${borderWidth}px solid ${normalBorderColor};` : '';
+        // Adjust padding to compensate for border width, keeping total size constant
+        const effectiveBorderWidth = normalShowBorder ? borderWidth : 0;
+        const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
 
         // Apply spacing only to app icons that are NOT the first one after separator
         // Use margin-top for vertical layout, margin-left for horizontal
@@ -1850,7 +1865,7 @@ export default class ObisionExtensionDash extends Extension {
         const baseStyle = `
             background-color: ${bgColor};
             border-radius: ${cornerRadius}px;
-            padding: 4px;
+            padding: ${adjustedPadding}px;
             ${marginStyle}
             ${borderStyle}
         `;
@@ -1862,13 +1877,14 @@ export default class ObisionExtensionDash extends Extension {
         container._cornerRadius = cornerRadius;
         container._normalBorderStyle = borderStyle;
         container._marginStyle = marginStyle;
+        container._adjustedPadding = adjustedPadding;
         container._isVertical = isVertical;
         container._hoverProgress = 0;
         container._animationId = null;
 
         const hoverShowBorder = this._settings.get_boolean('icon-hover-show-border');
         const hoverBorderColor = this._settings.get_string('icon-hover-border-color');
-        const hoverBorderStyle = hoverShowBorder ? `border: 2px solid ${hoverBorderColor};` : '';
+        const hoverBorderStyle = hoverShowBorder ? `border: ${borderWidth}px solid ${hoverBorderColor};` : '';
 
         container._hoverBgColor = hoverBgColor;
         container._hoverBorderStyle = hoverBorderStyle;
@@ -1929,11 +1945,12 @@ export default class ObisionExtensionDash extends Extension {
             const currentBorder = container._hoverProgress > 0.5
                 ? container._hoverBorderStyle
                 : container._normalBorderStyle;
+            const adjustedPadding = container._adjustedPadding || 4;
 
             container.set_style(`
                 background-color: ${currentColor};
                 border-radius: ${container._cornerRadius}px;
-                padding: 4px;
+                padding: ${adjustedPadding}px;
                 ${container._marginStyle || ''}
                 ${currentBorder}
             `);

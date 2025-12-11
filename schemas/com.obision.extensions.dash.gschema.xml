@@ -197,13 +197,6 @@
       <description>Custom background color for icons</description>
     </key>
     
-    <key name="icon-size-multiplier" type="i">
-      <default>7</default>
-      <range min="1" max="8"/>
-      <summary>Icon size multiplier</summary>
-      <description>Multiplier for icon size (1-8, default 7 = 0.7)</description>
-    </key>
-    
     <key name="icon-normal-show-border" type="b">
       <default>false</default>
       <summary>Show icon normal border</summary>
@@ -238,6 +231,13 @@
       <default>"rgba(255,255,255,1.0)"</default>
       <summary>Icon selected border color</summary>
       <description>Color for icon borders in selected state</description>
+    </key>
+    
+    <key name="icon-border-width" type="i">
+      <default>2</default>
+      <range min="1" max="4"/>
+      <summary>Icon border width</summary>
+      <description>Width of icon borders in pixels</description>
     </key>
     
   </schema>

@@ -10,6 +10,10 @@ node_modules/
 
 # Build output
 builddir/
+debian/gnome-shell-extension-obision-dash/
+debian/*.substvars
+debian/debhelper-build-stamp
+debian/files
 
 # Compiled schemas
 schemas/gschemas.compiled
@@ -27,3 +31,4 @@ Thumbs.db
 # Package manager
 yarn.lock
 pnpm-lock.yaml
+debian/.debhelper/
