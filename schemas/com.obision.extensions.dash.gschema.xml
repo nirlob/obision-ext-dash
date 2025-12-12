@@ -246,5 +246,11 @@
       <description>Width of icon borders in pixels</description>
     </key>
     
+    <key name="running-indicator-color" type="s">
+      <default>"rgb(255,255,255)"</default>
+      <summary>Running indicator color</summary>
+      <description>Color for the running indicator dot below icons</description>
+    </key>
+    
   </schema>
 </schemalist>

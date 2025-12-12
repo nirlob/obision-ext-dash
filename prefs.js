@@ -960,6 +960,25 @@ const IconsSettingsPage = GObject.registerClass(
                 'sensitive',
                 GObject.BindingFlags.SYNC_CREATE
             );
+
+            // Running Indicator section
+            const runningIndicatorGroup = new Adw.PreferencesGroup({
+                title: 'Running Indicator',
+                description: 'Customize the running indicator dot below icons',
+            });
+
+            this.add(runningIndicatorGroup);
+
+            // Running indicator color
+            const runningIndicatorColorRow = new Adw.ActionRow({
+                title: 'Running Indicator Color',
+                subtitle: 'Color for the dot that appears below running apps',
+            });
+
+            const runningIndicatorColorButton = createColorPicker(settings, 'running-indicator-color');
+            runningIndicatorColorRow.add_suffix(runningIndicatorColorButton);
+            runningIndicatorColorRow.activatable_widget = runningIndicatorColorButton;
+            runningIndicatorGroup.add(runningIndicatorColorRow);
         }
     });
 
