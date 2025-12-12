@@ -75,7 +75,7 @@
     </key>
     
     <key name="background-color" type="s">
-      <default>"rgba(46,44,44,0.8)"</default>
+      <default>"rgba(46,44,44,1.0)"</default>
       <summary>Background color</summary>
       <description>Solid background color for the panel</description>
     </key>
