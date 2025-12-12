@@ -241,7 +241,7 @@
     
     <key name="icon-border-width" type="i">
       <default>2</default>
-      <range min="1" max="4"/>
+      <range min="1" max="3"/>
       <summary>Icon border width</summary>
       <description>Width of icon borders in pixels</description>
     </key>

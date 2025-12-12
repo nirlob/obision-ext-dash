@@ -508,7 +508,6 @@ export default class ObisionExtensionDash extends Extension {
             this._settings.connect('changed::icon-hover-show-border', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-hover-border-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-show-border', () => this._updateIconStyling()),
-            this._settings.connect('changed::icon-selected-use-system-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-selected-border-color', () => this._updateIconStyling()),
             this._settings.connect('changed::icon-border-width', () => this._updateIconStyling()),
             this._settings.connect('changed::auto-hide', () => this._updateAutoHide()),
@@ -1109,21 +1108,56 @@ export default class ObisionExtensionDash extends Extension {
             // Mark as active/focused - use same style as focused app icons
             button._isActivitiesActive = true;
 
-            // Apply focused/active style (blue highlight like focused apps)
+            // Get system accent color if enabled
+            const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
+            let accentColor = '#3584e4'; // Default blue
+
+            if (useSystemColor) {
+                try {
+                    const interfaceSettings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' });
+                    const accentColorName = interfaceSettings.get_string('accent-color');
+                    const accentColors = {
+                        'blue': '#3584e4',
+                        'teal': '#2190a4',
+                        'green': '#3a944a',
+                        'yellow': '#c88800',
+                        'orange': '#ed5b00',
+                        'red': '#e62d42',
+                        'pink': '#d56199',
+                        'purple': '#9141ac',
+                        'slate': '#6f8396',
+                    };
+                    accentColor = accentColors[accentColorName] || accentColor;
+                } catch (e) {
+                    log(`Error getting system accent color: ${e.message}`);
+                }
+            }
+
+            // Apply focused/active style
             const cornerRadius = button._cornerRadius || this._settings.get_int('icon-corner-radius');
             const marginStyle = button._marginStyle || '';
             const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
-            const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
-            const selectedBorderColor = useSystemColor ? this._getSystemHighlightColor() : this._settings.get_string('icon-selected-border-color');
             const borderWidth = this._settings.get_int('icon-border-width');
+
+            let selectedBorderColor;
+            if (useSystemColor) {
+                selectedBorderColor = accentColor;
+            } else {
+                selectedBorderColor = this._settings.get_string('icon-selected-border-color');
+            }
+
             const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
-            const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
-            const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
+
+            // Convert hex to rgba for background
+            const r = parseInt(accentColor.slice(1, 3), 16);
+            const g = parseInt(accentColor.slice(3, 5), 16);
+            const b = parseInt(accentColor.slice(5, 7), 16);
+            const bgColor = `rgba(${r}, ${g}, ${b}, 0.3)`;
 
             button.set_style(`
-                background-color: rgba(53, 132, 228, 0.3);
+                background-color: ${bgColor};
                 border-radius: ${cornerRadius}px;
-                padding: ${adjustedPadding}px;
+                padding: 0px;
                 ${marginStyle}
                 ${selectedBorderStyle}
             `);
@@ -1136,12 +1170,11 @@ export default class ObisionExtensionDash extends Extension {
             const bgColor = button._originalBgColor || 'transparent';
             const marginStyle = button._marginStyle || '';
             const borderStyle = button._normalBorderStyle || '';
-            const adjustedPadding = button._adjustedPadding || 4;
 
             button.set_style(`
                 background-color: ${bgColor};
                 border-radius: ${cornerRadius}px;
-                padding: ${adjustedPadding}px;
+                padding: 0px;
                 ${marginStyle}
                 ${borderStyle}
             `);
@@ -1759,26 +1792,61 @@ export default class ObisionExtensionDash extends Extension {
                 // App just got focus - apply focused style
                 container._isFocused = true;
 
-                // Change running indicator to blue and wider
+                // Get system accent color if enabled
+                const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
+                let accentColor = '#3584e4'; // Default blue
+
+                if (useSystemColor) {
+                    try {
+                        const interfaceSettings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' });
+                        const accentColorName = interfaceSettings.get_string('accent-color');
+                        // Map GNOME accent color names to hex values
+                        const accentColors = {
+                            'blue': '#3584e4',
+                            'teal': '#2190a4',
+                            'green': '#3a944a',
+                            'yellow': '#c88800',
+                            'orange': '#ed5b00',
+                            'red': '#e62d42',
+                            'pink': '#d56199',
+                            'purple': '#9141ac',
+                            'slate': '#6f8396',
+                        };
+                        accentColor = accentColors[accentColorName] || accentColor;
+                    } catch (e) {
+                        log(`Error getting system accent color: ${e.message}`);
+                    }
+                }
+
+                // Change running indicator to accent color and wider
                 if (container._runningIndicator) {
-                    container._runningIndicator.set_style('background-color: #3584e4; border-radius: 2px;');
+                    container._runningIndicator.set_style(`background-color: ${accentColor}; border-radius: 2px;`);
                     container._runningIndicator.set_width(14);
                 }
 
-                // Apply focused background style - use a visible blue tint
+                // Apply focused background style
                 const selectedShowBorder = this._settings.get_boolean('icon-selected-show-border');
-                const useSystemColor = this._settings.get_boolean('icon-selected-use-system-color');
-                const selectedBorderColor = useSystemColor ? this._getSystemHighlightColor() : this._settings.get_string('icon-selected-border-color');
                 const borderWidth = this._settings.get_int('icon-border-width');
-                const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
-                const effectiveBorderWidth = selectedShowBorder ? borderWidth : 0;
-                const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
+                let selectedBorderColor;
 
-                // Use a semi-transparent blue overlay for visibility
+                if (useSystemColor) {
+                    selectedBorderColor = accentColor;
+                } else {
+                    selectedBorderColor = this._settings.get_string('icon-selected-border-color');
+                }
+
+                const selectedBorderStyle = selectedShowBorder ? `border: ${borderWidth}px solid ${selectedBorderColor};` : '';
+
+                // Convert hex to rgba for background
+                const r = parseInt(accentColor.slice(1, 3), 16);
+                const g = parseInt(accentColor.slice(3, 5), 16);
+                const b = parseInt(accentColor.slice(5, 7), 16);
+                const bgColor = `rgba(${r}, ${g}, ${b}, 0.3)`;
+
                 container.set_style(`
-                    background-color: rgba(53, 132, 228, 0.3);
+                    background-color: ${bgColor};
                     border-radius: ${container._cornerRadius}px;
-                    padding: ${adjustedPadding}px;
+                    padding: 0px;
                     ${container._marginStyle || ''}
                     ${selectedBorderStyle}
                 `);
@@ -1794,19 +1862,12 @@ export default class ObisionExtensionDash extends Extension {
                 }
 
                 // Revert to normal background style
-                const normalShowBorder = this._settings.get_boolean('icon-normal-show-border');
-                const normalBorderColor = this._settings.get_string('icon-normal-border-color');
-                const borderWidth = this._settings.get_int('icon-border-width');
-                const normalBorderStyle = normalShowBorder ? `border: ${borderWidth}px solid ${normalBorderColor};` : '';
-                const effectiveBorderWidth = normalShowBorder ? borderWidth : 0;
-                const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
-
                 container.set_style(`
                     background-color: ${container._originalBgColor};
                     border-radius: ${container._cornerRadius}px;
-                    padding: ${adjustedPadding}px;
+                    padding: 0px;
                     ${container._marginStyle || ''}
-                    ${normalBorderStyle}
+                    ${container._normalBorderStyle || ''}
                 `);
             }
         }
@@ -1836,6 +1897,7 @@ export default class ObisionExtensionDash extends Extension {
         const isTransparent = this._settings.get_boolean('transparent-background');
         const normalShowBorder = this._settings.get_boolean('icon-normal-show-border');
         const normalBorderColor = this._settings.get_string('icon-normal-border-color');
+        const borderWidth = this._settings.get_int('icon-border-width');
 
         // Determine background color
         let bgColor;
@@ -1852,11 +1914,7 @@ export default class ObisionExtensionDash extends Extension {
             hoverBgColor = this._lightenColor(bgColor, 1.5);
         }
 
-        const borderWidth = this._settings.get_int('icon-border-width');
         const borderStyle = normalShowBorder ? `border: ${borderWidth}px solid ${normalBorderColor};` : '';
-        // Adjust padding to compensate for border width, keeping total size constant
-        const effectiveBorderWidth = normalShowBorder ? borderWidth : 0;
-        const adjustedPadding = Math.max(0, 4 - effectiveBorderWidth);
 
         // Apply spacing only to app icons that are NOT the first one after separator
         // Use margin-top for vertical layout, margin-left for horizontal
@@ -1868,7 +1926,7 @@ export default class ObisionExtensionDash extends Extension {
         const baseStyle = `
             background-color: ${bgColor};
             border-radius: ${cornerRadius}px;
-            padding: ${adjustedPadding}px;
+            padding: 0px;
             ${marginStyle}
             ${borderStyle}
         `;
@@ -1880,7 +1938,6 @@ export default class ObisionExtensionDash extends Extension {
         container._cornerRadius = cornerRadius;
         container._normalBorderStyle = borderStyle;
         container._marginStyle = marginStyle;
-        container._adjustedPadding = adjustedPadding;
         container._isVertical = isVertical;
         container._hoverProgress = 0;
         container._animationId = null;
@@ -1945,15 +2002,15 @@ export default class ObisionExtensionDash extends Extension {
             );
 
             // Use hover border when progress > 0.5, otherwise normal
-            const currentBorder = container._hoverProgress > 0.5
+            const isHoverState = container._hoverProgress > 0.5;
+            const currentBorder = isHoverState
                 ? container._hoverBorderStyle
                 : container._normalBorderStyle;
-            const adjustedPadding = container._adjustedPadding || 4;
 
             container.set_style(`
                 background-color: ${currentColor};
                 border-radius: ${container._cornerRadius}px;
-                padding: ${adjustedPadding}px;
+                padding: 0px;
                 ${container._marginStyle || ''}
                 ${currentBorder}
             `);
@@ -2034,11 +2091,7 @@ export default class ObisionExtensionDash extends Extension {
         return colorStr;
     }
 
-    _getSystemHighlightColor() {
-        // Return GNOME's default blue accent color
-        // This is the standard system highlight color used in GNOME
-        return 'rgb(53, 132, 228)';
-    } _updatePanelPosition() {
+    _updatePanelPosition() {
         if (!this._panel) return;
 
         const monitor = Main.layoutManager.primaryMonitor;
