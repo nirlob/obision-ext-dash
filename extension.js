@@ -1604,8 +1604,34 @@ export default class ObisionExtensionDash extends Extension {
 
         this._showAppsContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Dash Preferences
-        this._showAppsContextMenu.addAction('Dash Preferences...', () => {
+        // Session options submenu
+        const sessionSubMenu = new PopupMenu.PopupSubMenuMenuItem('Session');
+        this._showAppsContextMenu.addMenuItem(sessionSubMenu);
+
+        sessionSubMenu.menu.addAction('Lock Screen', () => {
+            Main.screenShield.lock(true);
+        });
+
+        sessionSubMenu.menu.addAction('Log Out...', () => {
+            SystemActions.getDefault().activateLogout();
+        });
+
+        sessionSubMenu.menu.addAction('Suspend', () => {
+            SystemActions.getDefault().activateSuspend();
+        });
+
+        sessionSubMenu.menu.addAction('Restart...', () => {
+            SystemActions.getDefault().activateRestart();
+        });
+
+        sessionSubMenu.menu.addAction('Power Off...', () => {
+            SystemActions.getDefault().activatePowerOff();
+        });
+
+        this._showAppsContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Preferences
+        this._showAppsContextMenu.addAction('Preferences...', () => {
             this._openOrFocusPreferences();
         });
 
@@ -1648,35 +1674,92 @@ export default class ObisionExtensionDash extends Extension {
         // Store anchor for cleanup
         this._dashContextMenu._anchor = anchor;
 
-        // Dash options
-        this._dashContextMenu.addAction('Dash Preferences...', () => {
-            this._openOrFocusPreferences();
+        // Auto Hide toggle
+        const autoHideItem = new PopupMenu.PopupSwitchMenuItem(
+            'Auto Hide',
+            this._settings.get_boolean('auto-hide')
+        );
+        autoHideItem.connect('toggled', (item) => {
+            this._settings.set_boolean('auto-hide', item.state);
         });
+        this._dashContextMenu.addMenuItem(autoHideItem);
+
+        // Panel Height with +/- buttons
+        const sizeItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+
+        const sizeBox = new St.BoxLayout({
+            vertical: false,
+            x_expand: true,
+        });
+
+        const sizeLabel = new St.Label({
+            text: 'Height',
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true,
+            style: 'color: #ffffff; margin-right: 20px;',
+        });
+        sizeBox.add_child(sizeLabel);
+
+        const controlsBox = new St.BoxLayout({
+            vertical: false,
+            style: 'spacing: 0px;',
+        });
+
+        const decreaseButton = new St.Button({
+            style_class: 'button',
+            style: 'border-radius: 99px; padding: 4px; width: 28px; height: 28px;',
+            child: new St.Icon({
+                icon_name: 'list-remove-symbolic',
+                icon_size: 16,
+            }),
+            can_focus: true,
+        });
+        const currentSize = this._settings.get_int('dash-size');
+        const sizeValue = new St.Label({
+            text: `${currentSize}px`,
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'min-width: 50px; text-align: center; color: #ffffff;',
+        });
+        decreaseButton.connect('clicked', () => {
+            const currentVal = this._settings.get_int('dash-size');
+            if (currentVal > 40) {
+                const newVal = Math.max(40, currentVal - 1);
+                this._settings.set_int('dash-size', newVal);
+                sizeValue.text = `${newVal}px`;
+            }
+        });
+        controlsBox.add_child(decreaseButton);
+
+        controlsBox.add_child(sizeValue);
+
+        const increaseButton = new St.Button({
+            style_class: 'button',
+            style: 'border-radius: 99px; padding: 4px; width: 28px; height: 28px;',
+            child: new St.Icon({
+                icon_name: 'list-add-symbolic',
+                icon_size: 16,
+            }),
+            can_focus: true,
+        });
+        increaseButton.connect('clicked', () => {
+            const currentVal = this._settings.get_int('dash-size');
+            if (currentVal < 200) {
+                const newVal = Math.min(200, currentVal + 1);
+                this._settings.set_int('dash-size', newVal);
+                sizeValue.text = `${newVal}px`;
+            }
+        });
+        controlsBox.add_child(increaseButton);
+
+        sizeBox.add_child(controlsBox);
+        sizeItem.add_child(sizeBox);
+        this._dashContextMenu.addMenuItem(sizeItem);
 
         this._dashContextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Session options submenu
-        const sessionSubMenu = new PopupMenu.PopupSubMenuMenuItem('Session');
-        this._dashContextMenu.addMenuItem(sessionSubMenu);
-
-        sessionSubMenu.menu.addAction('Lock Screen', () => {
-            Main.screenShield.lock(true);
-        });
-
-        sessionSubMenu.menu.addAction('Log Out...', () => {
-            SystemActions.getDefault().activateLogout();
-        });
-
-        sessionSubMenu.menu.addAction('Suspend', () => {
-            SystemActions.getDefault().activateSuspend();
-        });
-
-        sessionSubMenu.menu.addAction('Restart...', () => {
-            SystemActions.getDefault().activateRestart();
-        });
-
-        sessionSubMenu.menu.addAction('Power Off...', () => {
-            SystemActions.getDefault().activatePowerOff();
+        // Preferences
+        this._dashContextMenu.addAction('Preferences...', () => {
+            this._openOrFocusPreferences();
         });
 
         // Store menu reference for helper

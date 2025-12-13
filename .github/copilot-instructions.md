@@ -30,16 +30,28 @@ This is a **GNOME Shell 48 extension** that provides a customizable dash/taskbar
 2. **UI Hierarchy**:
     - `this._panel` → Main container added to `Main.layoutManager` chrome layer
     - `this._topBarContainer` → Wraps GNOME's native `Main.panel`
+    - `this._showAppsContainer` → Container for Show Apps button (outside scroll)
+    - `this._scrollContainer` → Scrollable wrapper with prev/next buttons
+    - `this._scrollView` → St.ScrollView containing icon box
     - `this._appIconsBox` → Custom-built app icons (favorites + running apps)
     - Native dash stays in overview but hidden
 
 3. **GSettings Schema**: All settings in `schemas/com.obision.extensions.dash.gschema.xml` must be compiled before use. Settings changes trigger real-time UI updates via `_settings.connect('changed::setting-name', callback)`.
 
-4. **Signal Management**: All signal connections must be tracked and disconnected in `disable()`. Pattern used throughout:
+4. **Signal Management**: All signal connections must be tracked and disconnected in `disable()`. Settings use array-based tracking initialized in `enable()`:
     ```javascript
-    this._settingsChangedIds.push(
-        this._settings.connect('changed::dash-position', () => this._repositionPanel())
-    );
+    // In enable()
+    this._settingsChangedIds = [
+        this._settings.connect('changed::dash-position', () => this._updatePanelPosition()),
+        this._settings.connect('changed::dash-size', () => this._updatePanelPosition()),
+        // ... more settings
+    ];
+
+    // In disable()
+    if (this._settingsChangedIds) {
+        this._settingsChangedIds.forEach(id => this._settings.disconnect(id));
+        this._settingsChangedIds = null;
+    }
     ```
 
 ### Development Workflows
@@ -101,15 +113,19 @@ this._settings.set_boolean('auto-hide', true);
 
 ### Common Gotchas
 
-1. **Startup Timing**: Shell may not be fully initialized when `enable()` is called. Check for `Main.overview.dash` existence and use `Main.layoutManager.connect('startup-complete', ...)` if needed.
+1. **Startup Timing**: Shell may not be fully initialized when `enable()` is called. Extension checks for `Main.overview.dash` existence and waits for `Main.layoutManager.connect('startup-complete', ...)` if needed. See `enable()` and `_initExtension()` pattern.
 
-2. **Cleanup Order**: In `disable()`, disconnect signals before destroying actors to avoid accessing destroyed objects.
+2. **Cleanup Order**: In `disable()`, disconnect signals before destroying actors to avoid accessing destroyed objects. Follow the cleanup order in the existing `disable()` method.
 
-3. **Schema Compilation**: After editing `.gschema.xml`, run `npm run compile-schemas` or settings won't load.
+3. **Schema Compilation**: After editing `.gschema.xml`, run `npm run compile-schemas` or settings won't load. Always include this in your build workflow.
 
-4. **Position Changes**: When dash position changes (LEFT/RIGHT/TOP/BOTTOM), panel must be destroyed and rebuilt (`_repositionPanel()` does full teardown/recreation).
+4. **Position Changes**: When dash position changes (LEFT/RIGHT/TOP/BOTTOM), panel must be destroyed and rebuilt (`_updatePanelPosition()` does full teardown/recreation).
 
 5. **TypeScript Config**: `tsconfig.json` is for IDE support only—code runs as pure JavaScript in GJS.
+
+6. **Auto-hide State**: Auto-hide creates/destroys a hover zone (`this._hoverZone`) that must be properly cleaned up. Check `_enableAutoHide()` and `_disableAutoHide()` patterns.
+
+7. **Icon Layout**: Icon size is auto-calculated based on panel size minus padding. Don't set icon size directly—adjust panel-size and panel-padding settings instead.
 
 ### Testing & Debugging
 
@@ -124,13 +140,27 @@ this._settings.set_boolean('auto-hide', true);
 - **SystemActions**: For power menu integration
 - **Main.panel**: Native top panel is wrapped and integrated into custom panel
 
-### Style Guide
+### Style Guide & Linting
 
+**Code Style**:
 - Use arrow functions for callbacks
 - Name private properties with leading underscore: `this._panel`
-- No semicolons (ESLint + Prettier configured)
+- **Use semicolons** (enforced by Prettier)
 - Prefer const/let over var
+- Single quotes for strings (`'string'` not `"string"`)
+- 4-space indentation (no tabs)
+- 100 character line width
 - Use template literals for multi-line CSS
+
+**Linting & Formatting**:
+```bash
+npm run lint              # Check for ESLint errors
+npm run lint:fix          # Auto-fix ESLint issues
+npm run format            # Format with Prettier
+npm run format:check      # Check formatting
+```
+
+**ESLint Config**: Allows unused vars with leading underscore (`_unused`), GJS globals (`log`, `logError`, `global`, etc.)
 
 ## Quick Reference
 
