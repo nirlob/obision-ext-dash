@@ -50,7 +50,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Checkout obision-packages repository
-      if: secrets.OBISION_PACKAGES_DEPLOY_KEY != ''
       uses: actions/checkout@v4
       with:
         repository: nirlob/obision-packages
@@ -58,7 +57,6 @@ jobs:
         path: obision-packages
         
     - name: Copy DEB to obision-packages
-      if: secrets.OBISION_PACKAGES_DEPLOY_KEY != ''
       run: |
         # Extract version from tag
         VERSION="${GITHUB_REF#refs/tags/v}"
@@ -75,7 +73,6 @@ jobs:
         echo "✅ Copied DEB files to obision-packages"
         
     - name: Update releases.json
-      if: secrets.OBISION_PACKAGES_DEPLOY_KEY != ''
       run: |
         cd obision-packages
         
@@ -106,7 +103,6 @@ jobs:
         cat releases.json
         
     - name: Update Packages file
-      if: secrets.OBISION_PACKAGES_DEPLOY_KEY != ''
       run: |
         cd obision-packages
         
@@ -117,7 +113,6 @@ jobs:
         echo "✅ Updated Packages file"
         
     - name: Commit and push to obision-packages
-      if: secrets.OBISION_PACKAGES_DEPLOY_KEY != ''
       run: |
         cd obision-packages
         
