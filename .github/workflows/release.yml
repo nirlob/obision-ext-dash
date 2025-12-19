@@ -86,9 +86,38 @@ jobs:
         
         echo "✅ Updated Packages file"
         
+        # Generate Release file with updated hashes
+        cat > Release << EOF
+Origin: Obision
+Label: Obision Packages
+Suite: stable
+Codename: stable
+Architectures: all amd64 arm64
+Components: main
+Description: Obision APT Repository
+Date: $(date -Ru)
+EOF
+        
+        # Add MD5Sum
+        echo "MD5Sum:" >> Release
+        md5sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        md5sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        
+        # Add SHA1
+        echo "SHA1:" >> Release
+        sha1sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        sha1sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        
+        # Add SHA256
+        echo "SHA256:" >> Release
+        sha256sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        sha256sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        
+        echo "✅ Updated Release file"
+        
         # Commit and push
         git add -A debs/
-        git add Packages Packages.gz
+        git add Packages Packages.gz Release
         git commit -m "Add obision-ext-dash ${VERSION}"
         git push origin master
         
