@@ -12,6 +12,8 @@ node_modules/
 builddir/
 *.shell-extension.zip
 debian/gnome-shell-extension-obision-dash/
+debian/obision-ext-dash/
+debian/.debhelper/
 debian/*.substvars
 debian/debhelper-build-stamp
 debian/files
