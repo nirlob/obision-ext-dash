@@ -47,14 +47,6 @@ gnome-extensions prefs obision-ext-dash@obision.com
 
 ## Releases
 
-Releases are automated through GitHub Actions. When a new tag is pushed:
-
-1. The extension is built and packaged as a `.deb` file
-2. A GitHub release is created with the `.deb` attached
-3. The `.deb` is copied to the [obision-packages](https://github.com/nirlob/obision-packages) repository
-4. The `releases.json` file is updated with the new version
-5. APT repository metadata (`Packages` and `Packages.gz`) is regenerated
-
 ### Creating a New Release
 
 ```bash
@@ -62,10 +54,12 @@ npm run release
 ```
 
 This script will:
-- Bump the version in `package.json` and `metadata.json`
-- Update `debian/changelog`
+- Bump the version in `package.json`, `metadata.json`, and `debian/changelog`
 - Commit the changes
 - Create and push a git tag
-- Trigger the GitHub Action to build and publish
+- Build the `.deb` package
+- Copy the package to [obision-packages](https://github.com/nirlob/obision-packages) repository
+- Update APT repository metadata (`Packages`, `Packages.gz`, and `Release`)
+- Push changes to obision-packages
 
-The GitHub Action uses the `OBISION_PACKAGES_DEPLOY_KEY` secret to push changes to the obision-packages repository.
+**Note**: Make sure you have `../obision-packages` cloned locally before running the release script.

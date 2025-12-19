@@ -18,7 +18,7 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	mkdir -p debian/gnome-shell-extension-obision-dash/usr/share/gnome-shell/extensions/obision-ext-dash@obision.com
-	unzip -q obision-ext-dash@obision.com.shell-extension.zip -d debian/gnome-shell-extension-obision-dash/usr/share/gnome-shell/extensions/obision-ext-dash@obision.com/
+	unzip -qn obision-ext-dash@obision.com.shell-extension.zip -d debian/gnome-shell-extension-obision-dash/usr/share/gnome-shell/extensions/obision-ext-dash@obision.com/
 
 override_dh_auto_clean:
 	rm -f *.zip

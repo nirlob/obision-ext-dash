@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to create a new release: bump version, commit, tag, and push
+# Script to create a new release: bump version, build, commit, tag, and push to both repos
 
 set -e  # Exit on error
 
@@ -70,15 +70,101 @@ git push origin master
 git push origin "v$NEW_VERSION"
 
 echo ""
-echo "✅ Release $NEW_VERSION created successfully!"
+echo "📦 Building .deb package..."
+npm run deb-build
+
+# Find the generated DEB file
+DEB_FILE=$(ls -t ../obision-ext-dash_*.deb 2>/dev/null | head -1)
+
+# Verify DEB exists
+if [ -z "$DEB_FILE" ] || [ ! -f "$DEB_FILE" ]; then
+    echo "❌ ERROR: DEB file not found!"
+    echo "Expected: ../obision-ext-dash_*.deb"
+    exit 1
+fi
+
+echo "✅ DEB package built successfully: $(basename $DEB_FILE)"
+
+# Upload to obision-packages
 echo ""
-echo "GitHub Actions will now:"
-echo "  1. Build the extension"
-echo "  2. Generate the .deb package"
-echo "  3. Create a GitHub release"
-echo "  4. Attach the .deb file to the release"
-echo "  5. Copy the .deb to obision-packages repository"
-echo "  6. Update releases.json with the new version"
-echo "  7. Regenerate Packages files for APT repository"
+echo "📤 Uploading to obision-packages repository..."
+
+# Check if obision-packages exists
+if [ ! -d "../obision-packages" ]; then
+    echo "❌ ERROR: ../obision-packages directory not found"
+    echo "Clone it first: cd .. && git clone git@github.com:nirlob/obision-packages.git"
+    exit 1
+fi
+
+cd ../obision-packages
+
+# Pull latest changes
+git pull origin master
+
+# Create debs directory if it doesn't exist
+mkdir -p debs
+
+# Remove old versions of the package
+rm -f debs/obision-ext-dash_*.deb
+
+# Copy the .deb file with versioned name
+cp "$DEB_FILE" debs/obision-ext-dash_${NEW_VERSION}_all.deb
+
+echo "✅ Copied DEB file to obision-packages/debs"
+
+# Regenerate Packages file
+dpkg-scanpackages --multiversion debs > Packages
+gzip -k -f Packages
+
+echo "✅ Updated Packages file"
+
+# Generate Release file
+cat > Release << EOF
+Origin: Obision
+Label: Obision Packages
+Suite: stable
+Codename: stable
+Architectures: all amd64 arm64
+Components: main
+Description: Obision APT Repository
+Date: $(date -Ru)
+EOF
+
+# Add checksums to Release file
+echo "MD5Sum:" >> Release
+for file in Packages Packages.gz; do
+  echo " $(md5sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+done
+
+echo "SHA1:" >> Release
+for file in Packages Packages.gz; do
+  echo " $(sha1sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+done
+
+echo "SHA256:" >> Release
+for file in Packages Packages.gz; do
+  echo " $(sha256sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+done
+
+echo "✅ Updated Release file"
+
+# Commit and push
+git add -A debs/
+git add Packages Packages.gz Release
+git commit -m "Add obision-ext-dash ${NEW_VERSION}"
+git push origin master
+
+echo "✅ Pushed changes to obision-packages"
+
+cd ../obision-ext-dash
+
 echo ""
-echo "Check progress at: https://github.com/nirlob/obision-ext-dash/actions"
+echo "✅ Release $NEW_VERSION completed successfully!"
+echo ""
+echo "Actions completed:"
+echo "  ✅ Version bumped and committed"
+echo "  ✅ Tag v$NEW_VERSION created and pushed"
+echo "  ✅ .deb package built"
+echo "  ✅ Package uploaded to obision-packages"
+echo "  ✅ Packages and Release files updated"
+echo ""
