@@ -68,4 +68,4 @@ This script will:
 - Create and push a git tag
 - Trigger the GitHub Action to build and publish
 
-See [.github/PACKAGES_TOKEN_SETUP.md](.github/PACKAGES_TOKEN_SETUP.md) for setting up the required access token.
+The GitHub Action uses the `OBISION_PACKAGES_DEPLOY_KEY` secret to push changes to the obision-packages repository.
