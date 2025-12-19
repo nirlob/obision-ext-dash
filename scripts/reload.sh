@@ -3,7 +3,7 @@
 
 # Script to reload the GNOME Shell extension
 
-EXTENSION_UUID="obision-extension-dash@obision.com"
+EXTENSION_UUID="obision-ext-dash@obision.com"
 
 echo "🔄 Reloading extension..."
 

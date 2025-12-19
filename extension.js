@@ -13,7 +13,7 @@ import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 
-export default class ObisionExtensionDash extends Extension {
+export default class ObisionExtDash extends Extension {
     constructor(metadata) {
         super(metadata);
         this._settings = null;
@@ -73,7 +73,7 @@ export default class ObisionExtensionDash extends Extension {
     }
 
     enable() {
-        log('Obision Extension Dash enabling - checking shell state');
+        log('Obision Ext Dash enabling - checking shell state');
 
         this._settings = this.getSettings();
         this._enableTimestamp = Date.now();
@@ -535,11 +535,11 @@ export default class ObisionExtensionDash extends Extension {
             return GLib.SOURCE_REMOVE;
         });
 
-        log('Obision Extension Dash enabled');
+        log('Obision Ext Dash enabled');
     }
 
     disable() {
-        log('Obision Extension Dash disabling');
+        log('Obision Ext Dash disabling');
 
         // Cancel startup listener if still waiting
         if (this._startupCompleteId) {
@@ -782,7 +782,7 @@ export default class ObisionExtensionDash extends Extension {
         this._appSystem = null;
         this._appIconsBox = null;
 
-        log('Obision Extension Dash disabled');
+        log('Obision Ext Dash disabled');
     }
 
     _buildAppIcons() {
@@ -2920,7 +2920,7 @@ export default class ObisionExtensionDash extends Extension {
         for (const win of dominated) {
             const title = win.get_title();
             // Check if it's our extension's preferences window
-            if (title && (title.includes('Obision') || title.includes('obision-extension-dash'))) {
+            if (title && (title.includes('Obision') || title.includes('obision-ext-dash'))) {
                 win.activate(global.get_current_time());
                 return;
             }

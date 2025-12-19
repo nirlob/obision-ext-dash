@@ -982,7 +982,7 @@ const IconsSettingsPage = GObject.registerClass(
         }
     });
 
-export default class ObisionExtensionDashPreferences extends ExtensionPreferences {
+export default class ObisionExtDashPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings('com.obision.extensions.dash');
 

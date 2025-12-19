@@ -44,7 +44,7 @@ AUTHOR_NAME="Jose Francisco Gonzalez"
 AUTHOR_EMAIL="jfgs1609@gmail.com"
 
 cat > debian/changelog.tmp << EOF
-obision-extension-dash ($NEW_VERSION-1) unstable; urgency=medium
+obision-ext-dash ($NEW_VERSION-1) unstable; urgency=medium
 
   * Release version $NEW_VERSION
 
@@ -78,4 +78,4 @@ echo "  2. Generate the .deb package"
 echo "  3. Create a GitHub release"
 echo "  4. Attach the .deb file to the release"
 echo ""
-echo "Check progress at: https://github.com/nirlob/obision-extension-dash/actions"
+echo "Check progress at: https://github.com/nirlob/obision-ext-dash/actions"

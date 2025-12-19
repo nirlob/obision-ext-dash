@@ -1,10 +1,10 @@
-# Obision Extension Dash - AI Coding Agent Instructions
+# Obision Ext Dash - AI Coding Agent Instructions
 
 ## Project Overview
 
 This is a **GNOME Shell 48 extension** that provides a customizable dash/taskbar panel. Unlike other dash extensions, this project **reuses GNOME Shell's native dash** (hiding the original) and creates a custom panel with app icons, system tray integration, and extensive customization options.
 
-**Architecture**: Single-file extension (`extension.js` ~3200 lines) with separate preferences UI (`prefs.js` ~1000 lines).
+**Architecture**: Single-file extension (`extension.js` ~3400 lines) with separate preferences UI (`prefs.js` ~1000 lines).
 
 ## Critical Development Context
 
@@ -30,11 +30,20 @@ This is a **GNOME Shell 48 extension** that provides a customizable dash/taskbar
 2. **UI Hierarchy**:
     - `this._panel` → Main container added to `Main.layoutManager` chrome layer
     - `this._topBarContainer` → Wraps GNOME's native `Main.panel`
-    - `this._showAppsContainer` → Container for Show Apps button (outside scroll)
-    - `this._scrollContainer` → Scrollable wrapper with prev/next buttons
+    - `this._showAppsContainer` → Container for Show Apps button (outside scroll, gets full padding)
+    - `this._scrollContainer` → Scrollable wrapper with prev/next buttons (padding excludes side adjacent to show apps)
     - `this._scrollView` → St.ScrollView containing icon box
     - `this._appIconsBox` → Custom-built app icons (favorites + running apps)
     - Native dash stays in overview but hidden
+
+    **Icon Management**: `_buildAppIcons()` creates app icons in order:
+    1. Show Apps button (in `_showAppsContainer`, outside scroll)
+    2. Apps separator (inside scroll)
+    3. Favorite apps (from `AppFavorites.getAppFavorites()`)
+    4. Running separator (if non-favorite running apps exist)
+    5. Non-favorite running apps (from `Shell.AppSystem.get_default().get_running()`)
+    
+    Icon size is auto-calculated: `containerSize - iconPadding` where `containerSize = dashSize - (2 * panel-padding)`. Never set icon size directly—adjust `dash-size` and `panel-padding` settings.
 
 3. **GSettings Schema**: All settings in `schemas/com.obision.extensions.dash.gschema.xml` must be compiled before use. Settings changes trigger real-time UI updates via `_settings.connect('changed::setting-name', callback)`.
 
@@ -68,14 +77,18 @@ npm run reload              # Disable/enable cycle (scripts/reload.sh)
 
 **Important**: GNOME Shell caching is aggressive. Use `npm run update` during active development. For Wayland, full logout/login may be needed for major changes.
 
-**Debian Packaging**:
+**Debian Packaging**: Extension can be packaged as `.deb` for system-wide installation:
 
 ```bash
 npm run deb-build           # Build .deb package using dpkg-buildpackage
 npm run deb-install         # Install system-wide via dpkg
+npm run deb-uninstall       # Remove system-wide installation
+npm run deb-clean           # Clean build artifacts
 ```
 
-**Reset Settings**: `npm run reset` clears all dconf settings for the extension.
+Package is named `gnome-shell-extension-obision-dash` and installs to `/usr/share/gnome-shell/extensions/`. See `debian/control` for dependencies (requires GNOME Shell >= 45).
+
+**Reset Settings**: `npm run reset` clears all dconf settings for the extension (`dconf reset -f /org/gnome/shell/extensions/obision-ext-dash/`).
 
 ### Code Patterns & Conventions
 
@@ -104,7 +117,7 @@ this._settings.set_boolean('auto-hide', true);
 
 ### Key Files & Their Roles
 
-- **`extension.js`**: Single class `ObisionExtensionDash extends Extension`. Contains all panel logic, app icon management, auto-hide behavior, and UI construction.
+- **`extension.js`**: Single class `ObisionExtDash extends Extension`. Contains all panel logic, app icon management, auto-hide behavior, and UI construction.
 - **`prefs.js`**: Uses Adwaita (`Adw`) widgets to build multi-page preferences window. Extends `ExtensionPreferences`.
 - **`metadata.json`**: Extension UUID, supported shell versions (currently `["48"]`), and integer version number.
 - **`schemas/*.gschema.xml`**: GSettings schema. Changes require `glib-compile-schemas` before use.
@@ -127,11 +140,15 @@ this._settings.set_boolean('auto-hide', true);
 
 7. **Icon Layout**: Icon size is auto-calculated based on panel size minus padding. Don't set icon size directly—adjust panel-size and panel-padding settings instead.
 
+8. **Scroll Visibility**: Scroll buttons visibility updates are delayed (200ms, 500ms) after `_buildAppIcons()` to let layout settle. Use `_updateScrollButtonsVisibility()` which checks if content overflows the scroll view.
+
+9. **Focus Tracking**: Extension tracks focused app via `global.display.connect('notify::focus-window')` to highlight the active icon. Focused state is updated in `_updateFocusedApp()` which adds/removes the `focused` style class.
+
 ### Testing & Debugging
 
 - **Logs**: Use `log('message')` and `logError('message', error)`. View with: `journalctl -f -o cat /usr/bin/gnome-shell`
 - **Looking Glass**: Alt+F2, type `lg` for GNOME Shell inspector
-- **Preferences**: Test with `gnome-extensions prefs obision-extension-dash@obision.com`
+- **Preferences**: Test with `gnome-extensions prefs obision-ext-dash@obision.com`
 
 ### Integration Points
 
@@ -160,7 +177,7 @@ npm run format            # Format with Prettier
 npm run format:check      # Check formatting
 ```
 
-**ESLint Config**: Allows unused vars with leading underscore (`_unused`), GJS globals (`log`, `logError`, `global`, etc.)
+**ESLint Config**: Allows unused vars with leading underscore (`_unused`), GJS globals (`log`, `logError`, `global`, `imports`, `ARGV`). ES2022 syntax enabled, sourceType is `module` for ES6 imports.
 
 ## Quick Reference
 

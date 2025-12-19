@@ -26,11 +26,11 @@ jobs:
       run: |
         dpkg-buildpackage -us -uc -b
         mkdir -p builddir
-        mv ../gnome-shell-extension-obision-dash_*.deb builddir/obision-extension-dash.deb
+        mv ../gnome-shell-extension-obision-dash_*.deb builddir/obision-ext-dash.deb
         
     - name: Verify DEB exists
       run: |
-        if [ ! -f builddir/obision-extension-dash.deb ]; then
+        if [ ! -f builddir/obision-ext-dash.deb ]; then
           echo "ERROR: DEB file not found!"
           echo "Contents of builddir:"
           ls -la builddir/ || echo "builddir not found"
@@ -39,12 +39,12 @@ jobs:
           exit 1
         fi
         echo "✅ DEB file found:"
-        ls -lh builddir/obision-extension-dash.deb
+        ls -lh builddir/obision-ext-dash.deb
       
     - name: Create Release and Upload DEB
       uses: softprops/action-gh-release@v1
       with:
-        files: builddir/obision-extension-dash.deb
+        files: builddir/obision-ext-dash.deb
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

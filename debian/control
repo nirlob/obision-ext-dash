@@ -1,12 +1,12 @@
-Source: obision-extension-dash
+Source: obision-ext-dash
 Section: gnome
 Priority: optional
 Maintainer: Jose Francisco Gonzalez <jfgs1609@gmail.com>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.0
-Homepage: https://github.com/nirlob/obision-extension-dash
-Vcs-Git: https://github.com/nirlob/obision-extension-dash.git
-Vcs-Browser: https://github.com/nirlob/obision-extension-dash
+Homepage: https://github.com/nirlob/obision-ext-dash
+Vcs-Git: https://github.com/nirlob/obision-ext-dash.git
+Vcs-Browser: https://github.com/nirlob/obision-ext-dash
 
 Package: gnome-shell-extension-obision-dash
 Architecture: all

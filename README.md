@@ -1,4 +1,4 @@
-# Obision Extension Dash
+# Obision Ext Dash
 
 Custom dash panel for GNOME Shell that reuses the native dash.
 
@@ -21,7 +21,7 @@ npm run install
 
 Then enable the extension:
 ```bash
-gnome-extensions enable obision-extension-dash@obision.com
+gnome-extensions enable obision-ext-dash@obision.com
 ```
 
 Or reload GNOME Shell (Alt+F2, type 'r', Enter on X11).
@@ -36,7 +36,7 @@ npm run update  # Build, install, and reload
 
 Access preferences through GNOME Extensions app or:
 ```bash
-gnome-extensions prefs obision-extension-dash@obision.com
+gnome-extensions prefs obision-ext-dash@obision.com
 ```
 
 - **Position**: Where to place the dash (Left/Right/Top/Bottom)

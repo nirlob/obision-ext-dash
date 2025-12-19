@@ -8,14 +8,14 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🔨 Building .deb package for obision-extension-dash${NC}"
+echo -e "${BLUE}🔨 Building .deb package for obision-ext-dash${NC}"
 
 # Get version from metadata.json
 VERSION=$(jq -r .version metadata.json)
-EXTENSION_UUID="obision-extension-dash@obision.com"
+EXTENSION_UUID="obision-ext-dash@obision.com"
 PACKAGE_NAME="gnome-shell-extension-obision-dash"
 OUTPUT_DIR="builddir"
-DEB_FILE="${OUTPUT_DIR}/obision-extension-dash.deb"
+DEB_FILE="${OUTPUT_DIR}/obision-ext-dash.deb"
 BUILD_DIR="deb-build"
 
 # Create output directory

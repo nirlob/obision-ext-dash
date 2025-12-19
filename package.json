@@ -1,5 +1,5 @@
 {
-  "name": "obision-extension-dash",
+  "name": "obision-ext-dash",
   "version": "0.1.0",
   "description": "A GNOME Shell extension for dash management",
   "main": "extension.js",
@@ -7,13 +7,13 @@
     "build": "npm run compile-schemas && npm run pack",
     "compile-schemas": "glib-compile-schemas schemas/",
     "pack": "mkdir -p builddir && gnome-extensions pack --force --extra-source=schemas/ --out-dir=builddir",
-    "install": "gnome-extensions install --force builddir/obision-extension-dash@obision.com.shell-extension.zip",
-    "enable": "gnome-extensions enable obision-extension-dash@obision.com",
+    "install": "gnome-extensions install --force builddir/obision-ext-dash@obision.com.shell-extension.zip",
+    "enable": "gnome-extensions enable obision-ext-dash@obision.com",
     "deploy": "npm run build && npm run install && echo '\n✓ Extension installed! Restart GNOME Shell:' && echo '  X11: Alt+F2 → type r → Enter' && echo '  Wayland: Log out and back in' && echo '\nThen run: npm run enable'",
     "reload": "./scripts/reload.sh",
     "update": "npm run build && npm run install && npm run reload",
-    "deb-build": "dpkg-buildpackage -us -uc -b && mkdir -p builddir && mv ../gnome-shell-extension-obision-dash_*.deb builddir/obision-extension-dash.deb && mv ../gnome-shell-extension-obision-dash_*.buildinfo builddir/ 2>/dev/null || true && mv ../gnome-shell-extension-obision-dash_*.changes builddir/ 2>/dev/null || true",
-    "deb-install": "sudo dpkg -i builddir/obision-extension-dash.deb && sudo apt-get install -f",
+    "deb-build": "dpkg-buildpackage -us -uc -b && mkdir -p builddir && mv ../gnome-shell-extension-obision-dash_*.deb builddir/obision-ext-dash.deb && mv ../gnome-shell-extension-obision-dash_*.buildinfo builddir/ 2>/dev/null || true && mv ../gnome-shell-extension-obision-dash_*.changes builddir/ 2>/dev/null || true",
+    "deb-install": "sudo dpkg -i builddir/obision-ext-dash.deb && sudo apt-get install -f",
     "deb-uninstall": "sudo apt-get remove gnome-shell-extension-obision-dash -y",
     "deb-clean": "dh_clean || true",
     "release": "./scripts/release.sh",
@@ -22,7 +22,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,css,md}\"",
-    "reset": "dconf reset -f /org/gnome/shell/extensions/obision-extension-dash/"
+    "reset": "dconf reset -f /org/gnome/shell/extensions/obision-ext-dash/"
   },
   "keywords": [
     "gnome",
@@ -34,12 +34,12 @@
   "author": "Jose Francisco Gonzalez <jfgs1609@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nirlob/obision-extension-dash.git"
+    "url": "https://github.com/nirlob/obision-ext-dash.git"
   },
   "bugs": {
-    "url": "https://github.com/nirlob/obision-extension-dash/issues"
+    "url": "https://github.com/nirlob/obision-ext-dash/issues"
   },
-  "homepage": "https://github.com/nirlob/obision-extension-dash#readme",
+  "homepage": "https://github.com/nirlob/obision-ext-dash#readme",
   "license": "GPL-3.0",
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
