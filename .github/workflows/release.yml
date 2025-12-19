@@ -75,6 +75,9 @@ jobs:
         # Create debs directory if it doesn't exist
         mkdir -p debs
         
+        # Remove old versions of the package
+        rm -f debs/obision-ext-dash_*.deb
+        
         # Copy DEB with versioned name
         cp ../obision-ext-dash/builddir/obision-ext-dash.deb "debs/obision-ext-dash_${VERSION}_all.deb"
         
