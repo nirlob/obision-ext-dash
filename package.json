@@ -22,7 +22,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,css,md}\"",
-    "reset": "dconf reset -f /org/gnome/shell/extensions/obision-ext-dash/"
+    "reset": "dconf reset -f /com/obision/ext/dash/"
   },
   "keywords": [
     "gnome",

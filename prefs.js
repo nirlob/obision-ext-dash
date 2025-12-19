@@ -984,7 +984,7 @@ const IconsSettingsPage = GObject.registerClass(
 
 export default class ObisionExtDashPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings('com.obision.extensions.dash');
+        const settings = this.getSettings('com.obision.ext.dash');
 
         // Add pages
         const panelPage = new PanelSettingsPage(settings);

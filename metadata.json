@@ -7,5 +7,5 @@
   ],
   "version": 2,
   "url": "https://github.com/nirlob/obision-ext-dash",
-  "settings-schema": "com.obision.extensions.dash"
+  "settings-schema": "com.obision.ext.dash"
 }

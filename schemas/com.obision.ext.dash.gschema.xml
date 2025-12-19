@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="com.obision.extensions.dash" path="/com/obision/extensions/dash/">
+  <schema id="com.obision.ext.dash" path="/com/obision/ext/dash/">
     
     <key name="dash-position" type="s">
       <default>"BOTTOM"</default>

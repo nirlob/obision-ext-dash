@@ -45,7 +45,7 @@ This is a **GNOME Shell 48 extension** that provides a customizable dash/taskbar
     
     Icon size is auto-calculated: `containerSize - iconPadding` where `containerSize = dashSize - (2 * panel-padding)`. Never set icon size directly—adjust `dash-size` and `panel-padding` settings.
 
-3. **GSettings Schema**: All settings in `schemas/com.obision.extensions.dash.gschema.xml` must be compiled before use. Settings changes trigger real-time UI updates via `_settings.connect('changed::setting-name', callback)`.
+3. **GSettings Schema**: All settings in `schemas/com.obision.ext.dash.gschema.xml` must be compiled before use. Settings changes trigger real-time UI updates via `_settings.connect('changed::setting-name', callback)`.
 
 4. **Signal Management**: All signal connections must be tracked and disconnected in `disable()`. Settings use array-based tracking initialized in `enable()`:
     ```javascript
