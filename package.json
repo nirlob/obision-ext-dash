@@ -1,6 +1,6 @@
 {
   "name": "obision-ext-dash",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "A GNOME Shell extension for dash management",
   "main": "extension.js",
   "scripts": {
