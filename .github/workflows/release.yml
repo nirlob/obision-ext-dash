@@ -89,8 +89,8 @@ jobs:
         
         echo "✅ Updated Packages file"
         
-        # Generate Release file with updated hashes
-        cat > Release << 'RELEASE_EOF'
+        # Generate Release file
+        cat > Release << EOF
         Origin: Obision
         Label: Obision Packages
         Suite: stable
@@ -98,23 +98,24 @@ jobs:
         Architectures: all amd64 arm64
         Components: main
         Description: Obision APT Repository
-        RELEASE_EOF
-        echo "Date: $(date -Ru)" >> Release
+        Date: $(date -Ru)
+        EOF
         
-        # Add MD5Sum
+        # Add checksums to Release file
         echo "MD5Sum:" >> Release
-        md5sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
-        md5sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        for file in Packages Packages.gz; do
+          echo " $(md5sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+        done
         
-        # Add SHA1
         echo "SHA1:" >> Release
-        sha1sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
-        sha1sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        for file in Packages Packages.gz; do
+          echo " $(sha1sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+        done
         
-        # Add SHA256
         echo "SHA256:" >> Release
-        sha256sum Packages | awk '{print " " $1, $(NF-1), $NF}' >> Release
-        sha256sum Packages.gz | awk '{print " " $1, $(NF-1), $NF}' >> Release
+        for file in Packages Packages.gz; do
+          echo " $(sha256sum $file | cut -d' ' -f1) $(wc -c < $file) $file" >> Release
+        done
         
         echo "✅ Updated Release file"
         
