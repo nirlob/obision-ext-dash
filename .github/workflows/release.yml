@@ -87,16 +87,16 @@ jobs:
         echo "✅ Updated Packages file"
         
         # Generate Release file with updated hashes
-        cat > Release << EOF
-Origin: Obision
-Label: Obision Packages
-Suite: stable
-Codename: stable
-Architectures: all amd64 arm64
-Components: main
-Description: Obision APT Repository
-Date: $(date -Ru)
-EOF
+        cat > Release << 'RELEASE_EOF'
+        Origin: Obision
+        Label: Obision Packages
+        Suite: stable
+        Codename: stable
+        Architectures: all amd64 arm64
+        Components: main
+        Description: Obision APT Repository
+        RELEASE_EOF
+        echo "Date: $(date -Ru)" >> Release
         
         # Add MD5Sum
         echo "MD5Sum:" >> Release
