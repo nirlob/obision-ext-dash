@@ -72,50 +72,24 @@ jobs:
         git clone git@github.com:nirlob/obision-packages.git
         cd obision-packages
         
-        # Create packages directory if it doesn't exist
-        mkdir -p packages
+        # Create debs directory if it doesn't exist
+        mkdir -p debs
         
         # Copy DEB with versioned name
-        cp ../obision-ext-dash/builddir/obision-ext-dash.deb "packages/obision-ext-dash_${VERSION}.deb"
+        cp ../obision-ext-dash/builddir/obision-ext-dash.deb "debs/obision-ext-dash_${VERSION}_all.deb"
         
-        # Also copy as latest
-        cp ../obision-ext-dash/builddir/obision-ext-dash.deb packages/obision-ext-dash-latest.deb
+        echo "✅ Copied DEB file to obision-packages/debs"
         
-        echo "✅ Copied DEB files to obision-packages"
-        
-        # Update releases.json
-        RELEASE_DATE=$(date -u +"%Y-%m-%d")
-        
-        # Create releases.json if it doesn't exist
-        if [ ! -f releases.json ]; then
-          echo '{"packages": []}' > releases.json
-        fi
-        
-        # Update releases.json using jq
-        jq --arg version "$VERSION" \
-           --arg date "$RELEASE_DATE" \
-           --arg url "https://github.com/nirlob/obision-packages/raw/main/packages/obision-ext-dash_${VERSION}.deb" \
-           '.packages |= map(select(.name != "obision-ext-dash")) + [{
-             "name": "obision-ext-dash",
-             "version": $version,
-             "date": $date,
-             "url": $url,
-             "description": "GNOME Shell 48 extension that provides a customizable dash/taskbar panel"
-           }] | sort_by(.name)' releases.json > releases.json.tmp
-        
-        mv releases.json.tmp releases.json
-        
-        echo "✅ Updated releases.json"
-        
-        # Generate Packages file for APT repository
-        dpkg-scanpackages packages /dev/null > Packages
+        # Regenerate Packages file
+        dpkg-scanpackages --multiversion debs > Packages
         gzip -k -f Packages
         
         echo "✅ Updated Packages file"
         
         # Commit and push
-        git add packages/ releases.json Packages Packages.gz
+        git add -A debs/
+        git add Packages Packages.gz
         git commit -m "Add obision-ext-dash ${VERSION}"
-        git push origin main
+        git push origin master
         
         echo "✅ Pushed changes to obision-packages"
